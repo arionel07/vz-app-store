@@ -1,14 +1,10 @@
 import type { Metadata } from 'next'
-import { Geist } from 'next/font/google'
+import { Providers } from '@/components/providers'
 import './globals.css'
-
-const geist = Geist({
-	subsets: ['latin']
-})
 
 export const metadata: Metadata = {
 	title: 'Vizaje Staff',
-	description: 'Vizaje-Nica internal management'
+	description: 'Внутренняя система управления Vizaje Staff'
 }
 
 export default function RootLayout({
@@ -17,8 +13,10 @@ export default function RootLayout({
 	children: React.ReactNode
 }>) {
 	return (
-		<html lang="ru">
-			<body className={geist.className}>{children}</body>
+		<html lang="ru" suppressHydrationWarning>
+			<body>
+				<Providers>{children}</Providers>
+			</body>
 		</html>
 	)
 }
