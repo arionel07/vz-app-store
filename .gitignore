@@ -12,3 +12,8 @@ coverage/
 *.key
 *.p12
 *.pfx
+
+# Next.js
+**/.next/
+**/out/
+**/*.tsbuildinfo
