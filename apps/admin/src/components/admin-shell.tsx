@@ -10,17 +10,18 @@ import {
 	ChevronRight,
 	ClipboardList,
 	Image,
+	Leaf,
 	LayoutGrid,
 	Monitor,
 	Moon,
 	MoreHorizontal,
 	Plus,
+	Search,
 	Settings,
 	Store,
 	Sun,
 	UsersRound,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { cn } from 'cn'
 
 const navItems = [
@@ -60,7 +61,7 @@ function AccountMenu() {
 				<span className="account-copy"><strong>Администратор</strong><small>admin@vizaje.ru</small></span>
 				<ChevronRight size={15} className={cn('account-chevron', open && 'account-chevron-open')} />
 			</button>
-			{open && <div className="account-popover"><button type="button" onClick={() => toast.info('Профиль будет доступен в следующем обновлении')}>Профиль</button><button type="button" onClick={() => toast.info('Выход будет подключён вместе с авторизацией')}>Выйти</button></div>}
+			{open && <div className="account-popover"><button type="button" onClick={() => toast.info('Профиль будет доступен в следующем обновлении')}>Профиль</button><div className="account-theme"><span>Тема</span><ThemeSwitcher /></div><button type="button" onClick={() => toast.info('Выход будет подключён вместе с авторизацией')}>Выйти</button></div>}
 		</div>
 	)
 }
@@ -72,7 +73,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 	return (
 		<div className="admin-shell">
 			<aside className="sidebar">
-				<div className="sidebar-brand"><span className="brand-mark">V</span><span>vizaje <em>staff</em></span></div>
+				<div className="sidebar-brand"><Leaf size={17} strokeWidth={2.2} /><strong>Vizaje</strong><ChevronRight size={14} className="brand-chevron" /><button type="button" className="sidebar-search" aria-label="Поиск" onClick={() => toast.info('Поиск откроется по сочетанию ⌘ K')}><Search size={15} /></button><button type="button" className="sidebar-compose" aria-label="Создать" onClick={() => toast.info('Создание будет доступно после подключения API')}><Plus size={15} /></button></div>
 				<nav className="sidebar-nav" aria-label="Основная навигация">
 					<p className="sidebar-label">Рабочая область</p>
 					{navItems.map(({ label, icon: Icon, value }) => {
@@ -85,11 +86,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
 				<div className="sidebar-bottom">
 					<button type="button" className="nav-item" onClick={() => toast.info('Настройки будут доступны позже')}><Settings size={17} strokeWidth={1.8} /><span>Настройки</span></button>
 					<div className="sidebar-rule" />
-					<AccountMenu />
+					<p className="sidebar-footnote">Демонстрационный режим</p>
 				</div>
 			</aside>
 			<main className="app-main">
-				<div className="topbar"><div className="topbar-spacer" /><div className="topbar-actions"><button type="button" className="icon-button" aria-label="Уведомления" onClick={() => toast.info('Новых уведомлений нет')}><Bell size={17} /></button><ThemeSwitcher /><Button size="sm" onClick={() => toast.success('Форма добавления сотрудника будет подключена позже')}><Plus size={15} />Добавить сотрудника</Button><button type="button" className="icon-button" aria-label="Дополнительные действия" onClick={() => toast.info('Сейчас доступен только демонстрационный режим')}><MoreHorizontal size={18} /></button></div></div>
+				<div className="topbar"><div className="global-search"><Search size={15} /><span>Поиск сотрудников, магазинов, тестов...</span><kbd>⌘ K</kbd></div><div className="topbar-actions"><button type="button" className="icon-button notification-button" aria-label="Уведомления" onClick={() => toast.info('Новых уведомлений нет')}><Bell size={16} /><i className="notification-dot" /></button><AccountMenu /><button type="button" className="icon-button" aria-label="Дополнительные действия" onClick={() => toast.info('Сейчас доступен только демонстрационный режим')}><MoreHorizontal size={18} /></button></div></div>
 				<div className="page-container">{children}</div>
 			</main>
 		</div>
