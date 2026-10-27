@@ -1,0 +1,2 @@
+ALTER TABLE "photos" ADD CONSTRAINT "photos_file_size_max_check" CHECK ("photos"."file_size" <= 26214400);--> statement-breakpoint
+ALTER TABLE "photos" ADD CONSTRAINT "photos_mime_type_check" CHECK ("photos"."mime_type" in ('image/jpeg', 'image/png', 'image/webp'));

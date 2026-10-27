@@ -1,0 +1,19 @@
+{
+  "name": "vizaje-staff",
+  "private": true,
+  "packageManager": "bun@1.3.6",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --cwd apps/api dev",
+    "start": "bun run --cwd apps/api start",
+    "build": "bun run --cwd apps/api build",
+    "test": "bun run --cwd apps/api test",
+    "typecheck": "bun run --cwd apps/api typecheck",
+    "db:generate": "bun run --cwd apps/api db:generate",
+    "db:migrate": "bun run --cwd apps/api db:migrate",
+    "auth:bootstrap-admin": "bun run --cwd apps/api auth:bootstrap-admin"
+  }
+}
