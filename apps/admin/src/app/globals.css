@@ -205,7 +205,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .topbar .account-copy { display: none; }
 .topbar .account-avatar { width: 27px; height: 27px; }
 .topbar .account-chevron { width: 13px; }
-.topbar .account-popover { left: auto; width: 220px; }
+.topbar .account-popover { top: calc(100% + 8px); right: 0; bottom: auto; left: auto; width: 220px; }
 .notification-button { position: relative; }
 .notification-dot { position: absolute; top: 6px; right: 6px; width: 5px; height: 5px; border: 1px solid var(--surface); border-radius: 50%; background: #ef5b63; }
 .account-theme { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin: 5px 0; padding: 7px 9px; color: var(--muted-foreground); font-size: 11px; }

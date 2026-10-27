@@ -1,6 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -21,8 +22,11 @@ import {
 	Store,
 	Sun,
 	UsersRound,
+	LoaderCircle,
 } from 'lucide-react'
 import { cn } from 'cn'
+import { getBrowserCsrfToken } from '@/lib/auth-client'
+import { useSessionUser } from '@/components/session-provider'
 
 const navItems = [
 	{ label: 'Обзор', icon: LayoutGrid, value: 'overview' },
@@ -52,16 +56,52 @@ export function ThemeSwitcher() {
 	)
 }
 
+const roleLabels = {
+	admin: 'Администратор',
+	manager: 'Менеджер',
+	staff: 'Сотрудник',
+} as const
+
+function userInitials(firstName: string, lastName: string): string {
+	return `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase()
+}
+
 function AccountMenu() {
+	const user = useSessionUser()
+	const router = useRouter()
 	const [open, setOpen] = useState(false)
+	const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+	async function handleLogout() {
+		setIsLoggingOut(true)
+		try {
+			const csrfToken = getBrowserCsrfToken()
+			const response = await fetch('/api/auth/logout', {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : undefined,
+			})
+			if (!response.ok && response.status !== 401) {
+				toast.error('Не удалось завершить сеанс')
+				return
+			}
+			router.replace('/login')
+			router.refresh()
+		} catch {
+			toast.error('Сервис авторизации временно недоступен')
+		} finally {
+			setIsLoggingOut(false)
+		}
+	}
+
 	return (
 		<div className="account-menu-wrap">
 			<button type="button" className="account-row" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
-				<span className="account-avatar">АК</span>
-				<span className="account-copy"><strong>Администратор</strong><small>admin@vizaje.ru</small></span>
+				<span className="account-avatar">{userInitials(user.firstName, user.lastName)}</span>
+				<span className="account-copy"><strong>{user.firstName} {user.lastName}</strong><small>{user.email ?? roleLabels[user.role]}</small></span>
 				<ChevronRight size={15} className={cn('account-chevron', open && 'account-chevron-open')} />
 			</button>
-			{open && <div className="account-popover"><button type="button" onClick={() => toast.info('Профиль будет доступен в следующем обновлении')}>Профиль</button><div className="account-theme"><span>Тема</span><ThemeSwitcher /></div><button type="button" onClick={() => toast.info('Выход будет подключён вместе с авторизацией')}>Выйти</button></div>}
+			{open && <div className="account-popover"><div className="px-2 py-2 text-xs text-muted-foreground"><strong className="block text-foreground">{roleLabels[user.role]}</strong><span>{user.email ?? 'Email не указан'}</span></div><div className="account-theme"><span>Тема</span><ThemeSwitcher /></div><button type="button" disabled={isLoggingOut} onClick={handleLogout}>{isLoggingOut && <LoaderCircle size={14} className="mr-2 inline animate-spin" />}Выйти</button></div>}
 		</div>
 	)
 }
