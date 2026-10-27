@@ -78,6 +78,8 @@ bun run auth:bootstrap-admin  # interactively create the first administrator
 
 The project intentionally does not include Redis, queues, microservices, deployment configuration, or push automation yet.
 
+Production configuration, backup/restore, reverse-proxy, S3, and reconciliation procedures are documented in [`docs/production-readiness.md`](docs/production-readiness.md). No production credentials or external S3 verification are included in this repository.
+
 Users and Stores domain services and contracts are now available for trusted application callers. Management HTTP routes use the authenticated trusted principal resolver; client-supplied role or user ID headers are ignored.
 
 ## Authentication

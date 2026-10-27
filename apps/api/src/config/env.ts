@@ -109,6 +109,14 @@ export function loadEnv(source: Record<string, string | undefined> = runtimeEnv)
     });
   }
 
+  if (parsed.data.NODE_ENV === "production" && parsed.data.S3_ENDPOINT && new URL(parsed.data.S3_ENDPOINT).protocol !== "https:") {
+    issues.push({
+      code: z.ZodIssueCode.custom,
+      path: ["S3_ENDPOINT"],
+      message: "S3_ENDPOINT must use HTTPS in production",
+    });
+  }
+
   if (parsed.data.PHOTO_STORAGE_DRIVER === "s3") {
     for (const key of ["S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const) {
       if (!parsed.data[key]) {

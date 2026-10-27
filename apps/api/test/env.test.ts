@@ -41,3 +41,17 @@ test("requires S3 photo storage configuration in production", () => {
     }),
   ).toThrow(/S3_BUCKET is required/);
 });
+
+test("rejects an insecure S3 endpoint in production", () => {
+  expect(() =>
+    loadEnv({
+      NODE_ENV: "production",
+      DATABASE_URL: "postgres://user:password@example.com:5432/app",
+      PHOTO_STORAGE_DRIVER: "s3",
+      S3_ENDPOINT: "http://minio.example.com",
+      S3_BUCKET: "photos",
+      S3_ACCESS_KEY_ID: "access-key",
+      S3_SECRET_ACCESS_KEY: "secret-key",
+    }),
+  ).toThrow(/S3_ENDPOINT must use HTTPS in production/);
+});

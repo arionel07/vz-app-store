@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import {
   adminLoginRequestSchema,
   type AdminLoginRequest,
@@ -52,12 +52,16 @@ export class AuthService {
     const email = normalizeEmail(data.email)!;
     const rateKey = email;
     const allowed = this.loginRateLimiter.isAllowed(rateKey);
+    if (!allowed) {
+      throw new DomainError(401, "INVALID_CREDENTIALS", "Invalid email or password");
+    }
+
     const [user] = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
     const passwordHash = user?.passwordHash ?? (await this.dummyPasswordHash);
     const passwordMatches = await Bun.password.verify(data.password, passwordHash);
     const eligible = Boolean(user && user.isActive && (user.role === "admin" || user.role === "manager") && user.passwordHash && passwordMatches);
 
-    if (!allowed || !eligible) {
+    if (!eligible) {
       this.loginRateLimiter.recordFailure(rateKey);
       throw new DomainError(401, "INVALID_CREDENTIALS", "Invalid email or password");
     }
@@ -82,27 +86,32 @@ export class AuthService {
       throw new DomainError(400, "INVALID_BOOTSTRAP_INPUT", "A valid email and a password of at least 12 characters are required");
     }
 
-    const [existingAdmin] = await this.db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1);
-    if (existingAdmin) return { created: false };
-
-    const [existingUser] = await this.db.select({ id: users.id }).from(users).where(eq(users.email, normalizedEmail)).limit(1);
-    if (existingUser) throw new DomainError(409, "EMAIL_EXISTS", "Email already exists");
-
     const passwordHash = await Bun.password.hash(password, { algorithm: "argon2id" });
-    const [created] = await this.db
-      .insert(users)
-      .values({
-        firstName: "Initial",
-        lastName: "Administrator",
-        email: normalizedEmail,
-        phone: null,
-        passwordHash,
-        role: "admin",
-        isActive: true,
-      })
-      .returning({ id: users.id });
 
-    return { created: true, userId: created.id };
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('vizaje.bootstrap_admin'))`);
+
+      const [existingAdmin] = await tx.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1);
+      if (existingAdmin) return { created: false };
+
+      const [existingUser] = await tx.select({ id: users.id }).from(users).where(eq(users.email, normalizedEmail)).limit(1);
+      if (existingUser) throw new DomainError(409, "EMAIL_EXISTS", "Email already exists");
+
+      const [created] = await tx
+        .insert(users)
+        .values({
+          firstName: "Initial",
+          lastName: "Administrator",
+          email: normalizedEmail,
+          phone: null,
+          passwordHash,
+          role: "admin",
+          isActive: true,
+        })
+        .returning({ id: users.id });
+
+      return { created: true, userId: created.id };
+    });
   }
 
   async requestActivation(principal: TrustedPrincipal, userId: string, storeId: string): Promise<{ activationId: string; activationPayload: string; expiresAt: Date }> {
