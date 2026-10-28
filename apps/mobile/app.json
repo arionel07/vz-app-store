@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Vizaje Staff",
+    "slug": "vizaje-staff",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "vizaje-staff",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "jsEngine": "hermes",
+    "plugins": ["expo-router"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.vizaje.staff"
+    },
+    "android": {
+      "package": "com.vizaje.staff",
+      "adaptiveIcon": {
+        "backgroundColor": "#F6F6F3"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
