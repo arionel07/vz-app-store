@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { getAvailableQuiz, getCurrentUser, listAvailableQuizzes, listMyAttempts, redeemActivation, startQuizAttempt, submitQuizAttempt } from '../src/api/client'
+import { getAvailableQuiz, getCurrentUser, listAvailableQuizzes, listMyAttempts, redeemActivation, startQuizAttempt, submitQuizAttempt, uploadPhoto } from '../src/api/client'
 
 const originalFetch = globalThis.fetch
 const user = {
@@ -14,6 +14,10 @@ const quiz = {
 const attempt = {
 	id: '55555555-5555-4555-8555-555555555555', quizId: quiz.id, revisionId: quiz.revisionId, revisionNumber: 1,
 	status: 'submitted' as const, startedAt: '2026-01-01T00:00:00.000Z', submittedAt: '2026-01-01T00:01:00.000Z', scorePercent: 100, passed: true, quiz,
+}
+const photo = {
+	id: '66666666-6666-4666-8666-666666666666', storeId: '77777777-7777-4777-8777-777777777777', uploadedBy: user.id,
+	originalFilename: 'photo.jpg', mimeType: 'image/jpeg' as const, fileSize: 1234, createdAt: '2026-01-01T00:00:00.000Z',
 }
 
 describe('mobile API client', () => {
@@ -73,5 +77,26 @@ describe('mobile API client', () => {
 		await expect(startQuizAttempt('access-token', quiz.id)).rejects.toMatchObject({ status: 503 })
 		await expect(submitQuizAttempt('access-token', attempt.id, { answers: [{ questionId: quiz.questions[0].id, optionId: quiz.questions[0].options[0].id }] })).rejects.toMatchObject({ status: 503 })
 		expect(calls).toBe(2)
+	})
+
+	test('uploads one multipart file with bearer and idempotency headers without overriding the boundary', async () => {
+		globalThis.fetch = (async (_input, init) => {
+			expect(init?.method).toBe('POST')
+			expect(init?.headers).toMatchObject({ Authorization: 'Bearer access-token', Accept: 'application/json', 'Idempotency-Key': 'photo-key-1' })
+			expect(Object.keys(init?.headers as Record<string, string>)).not.toContain('Content-Type')
+			expect(init?.body).toBeInstanceOf(FormData)
+			return new Response(JSON.stringify(photo), { status: 201 })
+		}) as typeof fetch
+		expect(await uploadPhoto('access-token', photo.storeId, { uri: 'file:///photo.jpg', name: 'photo.jpg', type: 'image/jpeg' }, 'photo-key-1')).toEqual(photo)
+	})
+
+	test('does not silently retry a failed photo upload', async () => {
+		let calls = 0
+		globalThis.fetch = (async () => {
+			calls += 1
+			return new Response(JSON.stringify({ error: { code: 'SERVER_UNAVAILABLE', message: 'unavailable' } }), { status: 503 })
+		}) as unknown as typeof fetch
+		await expect(uploadPhoto('access-token', photo.storeId, { uri: 'file:///photo.jpg', name: 'photo.jpg', type: 'image/jpeg' }, 'photo-key-2')).rejects.toMatchObject({ status: 503 })
+		expect(calls).toBe(1)
 	})
 })

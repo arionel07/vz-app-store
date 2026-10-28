@@ -51,3 +51,4 @@ export const photoListResponseSchema = z.object({
 export type PhotoListQuery = z.infer<typeof photoListQuerySchema>;
 export type PhotoCollectionQuery = z.infer<typeof photoCollectionQuerySchema>;
 export type PhotoResponse = z.infer<typeof photoResponseSchema>;
+export type PhotoListResponse = z.infer<typeof photoListResponseSchema>;

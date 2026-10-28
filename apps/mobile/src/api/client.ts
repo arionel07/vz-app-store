@@ -9,6 +9,8 @@ import {
 	attemptListResponseSchema,
 	submitAttemptInputSchema,
 	storeListResponseSchema,
+	photoListResponseSchema,
+	photoResponseSchema,
 	userResponseSchema,
 	type AttemptListQuery,
 	type AttemptListResponse,
@@ -19,6 +21,8 @@ import {
 	type StaffQuizListResponse,
 	type StoreListQuery,
 	type StoreListResponse,
+	type PhotoListResponse,
+	type PhotoResponse,
 	type SubmitAttemptInput,
 	type UserResponse,
 } from '@vizaje/contracts'
@@ -59,6 +63,14 @@ type RequestOptions = {
 	body?: unknown
 	allowRetry?: boolean
 }
+
+export type PhotoUploadFile = {
+	uri: string
+	name: string
+	type: 'image/jpeg' | 'image/png' | 'image/webp'
+}
+
+export type PhotoUploadOptions = { signal?: AbortSignal }
 
 function requestError(status: number, body: unknown): ApiError {
 	const parsed = errorResponseSchema.safeParse(body)
@@ -171,4 +183,77 @@ export function listMyAttempts(token: string, query: AttemptListQuery = { page: 
 
 export function getMyAttempt(token: string, attemptId: string): Promise<AttemptResponse> {
 	return requestJson(`/api/v1/attempts/${encodeURIComponent(attemptId)}`, attemptResponseSchema, { token, allowRetry: true })
+}
+
+export function listPhotos(token: string, storeId: string, query: { page?: number; pageSize?: number } = {}): Promise<PhotoListResponse> {
+	const params = new URLSearchParams({
+		page: String(query.page ?? 1),
+		pageSize: String(query.pageSize ?? 20),
+	})
+	return requestJson(`/api/v1/stores/${encodeURIComponent(storeId)}/photos?${params.toString()}`, photoListResponseSchema, { token, allowRetry: true })
+}
+
+export async function uploadPhoto(token: string, storeId: string, file: PhotoUploadFile, idempotencyKey: string, options: PhotoUploadOptions = {}): Promise<PhotoResponse> {
+	const form = new FormData()
+	// React Native fetch turns this descriptor into a multipart file part. Do not
+	// set Content-Type manually: fetch must supply the boundary.
+	form.append('file', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob)
+	const controller = new AbortController()
+	const abortUpload = () => controller.abort()
+	if (options.signal?.aborted) controller.abort()
+	else options.signal?.addEventListener('abort', abortUpload)
+	const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+	try {
+		const response = await fetch(`${apiOrigin()}/api/v1/stores/${encodeURIComponent(storeId)}/photos`, {
+			method: 'POST',
+			headers: {
+				Accept: 'application/json',
+				Authorization: `Bearer ${token}`,
+				'Idempotency-Key': idempotencyKey,
+			},
+			body: form,
+			credentials: 'omit',
+			signal: controller.signal,
+		})
+		let body: unknown = null
+		try {
+			body = await response.json()
+		} catch {
+			body = null
+		}
+		if (!response.ok) throw requestError(response.status, body)
+		const parsed = photoResponseSchema.safeParse(body)
+		if (!parsed.success) throw new ApiError(502, 'INVALID_API_RESPONSE', 'Сервер вернул некорректный ответ')
+		return parsed.data
+	} catch (error) {
+		if (error instanceof ApiError) throw error
+		if (options.signal?.aborted) throw new ApiError(0, 'UPLOAD_CANCELLED', 'Загрузка отменена')
+		throw new ApiError(0, 'NETWORK_UNAVAILABLE', 'Сервис временно недоступен')
+	} finally {
+		clearTimeout(timeout)
+		options.signal?.removeEventListener('abort', abortUpload)
+	}
+}
+
+function photoExtension(mimeType: PhotoResponse['mimeType']): string {
+	return mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg'
+}
+
+export async function downloadPhotoImage(token: string, photo: Pick<PhotoResponse, 'id' | 'mimeType'>): Promise<string> {
+	const FileSystem = await import('expo-file-system/legacy')
+	if (!FileSystem.cacheDirectory) throw new ApiError(0, 'CACHE_UNAVAILABLE', 'Временное хранилище недоступно')
+	const target = `${FileSystem.cacheDirectory}vizaje-photo-${encodeURIComponent(photo.id)}.${photoExtension(photo.mimeType)}`
+	try {
+		const result = await FileSystem.downloadAsync(`${apiOrigin()}/api/v1/photos/${encodeURIComponent(photo.id)}`, target, {
+			headers: { Authorization: `Bearer ${token}`, Accept: photo.mimeType },
+		})
+		if (result.status < 200 || result.status >= 300) {
+			await FileSystem.deleteAsync(result.uri, { idempotent: true }).catch(() => undefined)
+			throw new ApiError(result.status, result.status === 401 ? 'UNAUTHENTICATED' : result.status === 404 ? 'PHOTO_NOT_FOUND' : 'PHOTO_DOWNLOAD_FAILED', 'Не удалось загрузить фотографию')
+		}
+		return result.uri
+	} catch (error) {
+		if (error instanceof ApiError) throw error
+		throw new ApiError(0, 'NETWORK_UNAVAILABLE', 'Сервис временно недоступен')
+	}
 }

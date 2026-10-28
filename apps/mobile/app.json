@@ -16,6 +16,14 @@
           "cameraPermission": "Vizaje Staff использует камеру для сканирования QR-кода активации.",
           "recordAudioAndroid": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Vizaje Staff использует выбранные фотографии для рабочего отчёта.",
+          "cameraPermission": "Vizaje Staff использует камеру для рабочего отчёта.",
+          "microphonePermission": false
+        }
       ]
     ],
     "ios": {
