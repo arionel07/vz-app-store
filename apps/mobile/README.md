@@ -11,10 +11,13 @@ continue to use the Admin web login.
 
 Run from the repository root with `bun run --cwd apps/mobile start`.
 
-`EXPO_PUBLIC_API_URL` is required. Use `http://127.0.0.1:3000` for the iOS
-Simulator, `http://10.0.2.2:3000` for the Android Emulator, or a reachable
-HTTPS staging origin for a physical device. A phone cannot use the host's
-localhost address.
+`EXPO_PUBLIC_API_URL` is required. For the iOS Simulator use
+`http://127.0.0.1:3000`, and for the Android Emulator use
+`http://10.0.2.2:3000`. Local HTTP requires
+`EXPO_PUBLIC_ALLOW_INSECURE_HTTP=true` and is accepted only in a development
+runtime for loopback/private/LAN hosts. For a physical device, prefer a
+reachable HTTPS staging origin or HTTPS tunnel; a phone cannot use the host's
+localhost address. Release builds always reject HTTP.
 
 `EXPO_PUBLIC_ACTIVATION_LINK_BASE_URL` is optional and must match the Admin
 `NEXT_PUBLIC_ACTIVATION_LINK_BASE_URL` value, such as

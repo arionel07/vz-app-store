@@ -20,6 +20,7 @@ import {
 import type { MobileSessionResponse, StoreResponse, UserResponse } from '@vizaje/contracts'
 
 export type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated' | 'offline' | 'storage-error'
+export type LoginSubmissionStatus = 'idle' | 'submitting'
 
 export type AuthenticatedUser = UserResponse & { assignedStores: StoreResponse[] }
 
@@ -27,6 +28,7 @@ type LogoutResult = { remoteRevoked: boolean; localCleared: boolean }
 
 type AuthContextValue = {
 	status: AuthStatus
+	loginSubmissionStatus: LoginSubmissionStatus
 	user: AuthenticatedUser | null
 	errorMessage: string | null
 	redeemActivation: (secret: string) => Promise<void>
@@ -66,6 +68,7 @@ function messageForRestore(error: unknown): string {
 
 export function AuthProvider({ children }: PropsWithChildren) {
 	const [status, setStatus] = useState<AuthStatus>('loading')
+	const [loginSubmissionStatus, setLoginSubmissionStatus] = useState<LoginSubmissionStatus>('idle')
 	const [user, setUser] = useState<AuthenticatedUser | null>(null)
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
 	const sessionRef = useRef<StoredSession | null>(null)
@@ -188,7 +191,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
 	}, [restore])
 
 	const redeemActivation = useCallback(async (secret: string) => {
-		setStatus('loading')
 		setErrorMessage(null)
 		try {
 			const deviceId = await getDeviceId()
@@ -201,13 +203,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
 				throw error
 			}
 			setErrorMessage(messageForRestore(error))
-			setStatus(isNetworkError(error) ? 'offline' : error instanceof StorageError ? 'storage-error' : 'unauthenticated')
 			throw error
 		}
 	}, [clearLocalSession, establishMobileSession, getDeviceId])
 
 	const loginMobile = useCallback(async (email: string, password: string) => {
-		setStatus('loading')
+		setLoginSubmissionStatus('submitting')
 		setErrorMessage(null)
 		try {
 			const deviceId = await getDeviceId()
@@ -219,9 +220,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
 				setErrorMessage('Не удалось безопасно сохранить сессию. Повторите попытку.')
 			} else {
 				setErrorMessage(isNetworkError(error) ? 'Нет соединения с сервером. Проверьте подключение и повторите попытку.' : 'Не удалось выполнить вход. Проверьте данные и повторите попытку.')
-				setStatus('unauthenticated')
 			}
 			throw error
+		} finally {
+			setLoginSubmissionStatus('idle')
 		}
 	}, [establishMobileSession, getDeviceId])
 
@@ -269,6 +271,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
 	const value = useMemo<AuthContextValue>(() => ({
 		status,
+		loginSubmissionStatus,
 		user,
 		errorMessage,
 		redeemActivation,
@@ -276,7 +279,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 		retryRestore: restore,
 		logout,
 		requestAuthenticated,
-	}), [errorMessage, loginMobile, logout, redeemActivation, requestAuthenticated, restore, status, user])
+	}), [errorMessage, loginMobile, loginSubmissionStatus, logout, redeemActivation, requestAuthenticated, restore, status, user])
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

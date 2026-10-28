@@ -42,17 +42,42 @@ export function isNetworkError(error: unknown): error is ApiError {
 	return error instanceof ApiError && error.status === 0
 }
 
-function apiOrigin(): string {
-	const configured = process.env.EXPO_PUBLIC_API_URL?.trim()
-	if (!configured) throw new ApiError(0, 'API_URL_REQUIRED', 'Адрес API не настроен')
+function isDevelopmentRuntime(): boolean {
+	if (typeof __DEV__ === 'boolean') return __DEV__
+	return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
+}
+
+function isPrivateIpv4(hostname: string): boolean {
+	const octets = hostname.split('.').map(Number)
+	if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) return false
+	return octets[0] === 10 || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) || (octets[0] === 192 && octets[1] === 168) || (octets[0] === 169 && octets[1] === 254)
+}
+
+function isLocalDevelopmentHost(hostname: string): boolean {
+	const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, '')
+	return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1' || normalized.endsWith('.local') || isPrivateIpv4(normalized)
+}
+
+export type ApiOriginOptions = { development?: boolean; allowInsecureHttp?: boolean }
+
+export function resolveApiOrigin(configured: string | undefined, options: ApiOriginOptions = {}): string {
+	if (!configured?.trim()) throw new ApiError(0, 'API_URL_REQUIRED', 'Адрес API не настроен')
+	let url: URL
 	try {
-		const url = new URL(configured)
-		const localDevelopment = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]' || url.hostname === '10.0.2.2'
-		if (url.protocol !== 'https:' && !(url.protocol === 'http:' && localDevelopment)) throw new Error('API must use HTTPS outside local development')
-		return url.toString().replace(/\/$/, '')
+		url = new URL(configured.trim())
 	} catch {
 		throw new ApiError(0, 'INVALID_API_URL', 'Адрес API настроен неверно')
 	}
+	if (url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new ApiError(0, 'INVALID_API_URL', 'Адрес API должен быть origin без учетных данных и пути')
+	if (url.protocol === 'https:') return url.toString().replace(/\/$/, '')
+	const development = options.development ?? isDevelopmentRuntime()
+	const allowInsecureHttp = options.allowInsecureHttp ?? process.env.EXPO_PUBLIC_ALLOW_INSECURE_HTTP === 'true'
+	if (url.protocol === 'http:' && development && allowInsecureHttp && isLocalDevelopmentHost(url.hostname)) return url.toString().replace(/\/$/, '')
+	throw new ApiError(0, 'INSECURE_API_URL', 'Адрес API должен использовать HTTPS; HTTP разрешён только для локальной разработки')
+}
+
+function apiOrigin(): string {
+	return resolveApiOrigin(process.env.EXPO_PUBLIC_API_URL)
 }
 
 type ResponseSchema<T> = {

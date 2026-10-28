@@ -45,4 +45,10 @@ describe('mobile navigation safety', () => {
 		expect(authRedirect('unauthenticated', '(tabs)')).toBe('/activation')
 		expect(authRedirect('unauthenticated', 'activation')).toBeNull()
 	})
+
+	test('does not replace the activation screen while login is pending', () => {
+		// Login submission is local state; the auth guard must continue rendering
+		// the unauthenticated activation route until a session is established.
+		expect(authRedirect('unauthenticated', 'activation')).toBeNull()
+	})
 })

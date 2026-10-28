@@ -8,7 +8,10 @@
 2. Скопируйте `apps/mobile/.env.example` в локальный `.env` и задайте `EXPO_PUBLIC_API_URL`:
    - iOS Simulator: `http://127.0.0.1:3000`;
    - Android Emulator: `http://10.0.2.2:3000`;
-   - физическое устройство: доступный по сети HTTPS staging endpoint.
+   - физическое устройство: доступный по сети HTTPS staging endpoint или HTTPS tunnel.
+   Для временной проверки через LAN HTTP задайте `EXPO_PUBLIC_ALLOW_INSECURE_HTTP=true`;
+   это работает только в development runtime и только для private/LAN адреса,
+   не для production build.
    Для проверки HTTPS activation link задайте также `EXPO_PUBLIC_ACTIVATION_LINK_BASE_URL` и используйте то же значение, что и в Admin.
 3. Убедитесь, что API доступен с устройства, а firewall допускает только нужный тестовый порт.
 4. Для локального native development build на macOS:
@@ -85,5 +88,5 @@
 - `expo-secure-store` is configured with Android backup rules and no Face ID prompt is requested by this app.
 - `expo-camera`, `expo-image-picker`, `expo-image-manipulator`, `expo-image`, `expo-file-system` and `expo-secure-store` are pinned to Expo SDK 58-compatible versions in the workspace lockfile.
 - Authenticated photo previews are downloaded to the app cache with an `Authorization` header; session tokens are not placed in image URLs or logs.
-- `EXPO_PUBLIC_API_URL` is mandatory at runtime. HTTP is accepted only for explicitly local simulator/emulator hosts; non-local endpoints must use HTTPS.
+- `EXPO_PUBLIC_API_URL` is mandatory at runtime. HTTP requires the explicit `EXPO_PUBLIC_ALLOW_INSECURE_HTTP=true` development setting and is limited to loopback/private/LAN hosts; release builds and non-local endpoints must use HTTPS.
 - HTTPS activation links are parser-ready but are not claimed as working until Apple/Android domain association and native device verification are complete. `vizaje://activate` remains the development fallback.

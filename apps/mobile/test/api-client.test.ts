@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { getAvailableQuiz, getCurrentUser, listAvailableQuizzes, listMyAttempts, mobileLogin, redeemActivation, startQuizAttempt, submitQuizAttempt, uploadPhoto } from '../src/api/client'
+import { getAvailableQuiz, getCurrentUser, listAvailableQuizzes, listMyAttempts, mobileLogin, redeemActivation, resolveApiOrigin, startQuizAttempt, submitQuizAttempt, uploadPhoto } from '../src/api/client'
+import { mobileLoginErrorMessage } from '../src/auth/login-errors'
 
 process.env.EXPO_PUBLIC_API_URL ??= 'http://127.0.0.1:3000'
+process.env.EXPO_PUBLIC_ALLOW_INSECURE_HTTP ??= 'true'
 
 const originalFetch = globalThis.fetch
 const user = {
@@ -27,7 +29,7 @@ describe('mobile API client', () => {
 
 	test('does not retry one-time activation redemption', async () => {
 		let calls = 0
-		globalThis.fetch = (async (_input, init) => {
+		globalThis.fetch = (async (_input: unknown, init?: RequestInit) => {
 			calls += 1
 			expect(init?.method).toBe('POST')
 			return new Response(JSON.stringify({ error: { code: 'INVALID_ACTIVATION', message: 'invalid' } }), { status: 401 })
@@ -46,6 +48,59 @@ describe('mobile API client', () => {
 		}) as typeof fetch
 		await expect(mobileLogin('staff@example.com', 'private-password', 'device-a')).rejects.toMatchObject({ status: 401, code: 'INVALID_CREDENTIALS' })
 		expect(calls).toBe(1)
+	})
+
+	test('returns a validated session after successful mobile login', async () => {
+		const response = {
+			accessToken: 'access-token',
+			expiresAt: '2026-10-28T12:00:00.000Z',
+			maxExpiresAt: '2026-12-28T12:00:00.000Z',
+			user,
+		}
+		globalThis.fetch = (async (_input: unknown, init?: RequestInit) => {
+			expect(init?.method).toBe('POST')
+			return new Response(JSON.stringify(response), { status: 201 })
+		}) as unknown as typeof fetch
+		expect(await mobileLogin('staff@example.com', 'private-password', 'device-a')).toEqual(response)
+	})
+
+	test('keeps invalid email and password errors generic', async () => {
+		globalThis.fetch = (async () => new Response(JSON.stringify({ error: { code: 'INVALID_CREDENTIALS', message: 'invalid' } }), { status: 401 })) as unknown as typeof fetch
+		for (const credentials of [
+			{ email: 'staff@example.com', password: 'wrong-password' },
+			{ email: 'unknown@example.com', password: 'private-password' },
+		]) {
+			let error: unknown
+			try {
+				await mobileLogin(credentials.email, credentials.password, 'device-a')
+			} catch (caught) {
+				error = caught
+			}
+			expect(error).toMatchObject({ status: 401, code: 'INVALID_CREDENTIALS' })
+			expect(mobileLoginErrorMessage(error)).toBe('Не удалось войти. Проверьте email и пароль.')
+		}
+	})
+
+	test('distinguishes network failures and server rate limiting', async () => {
+		globalThis.fetch = (async () => { throw new Error('network unavailable') }) as unknown as typeof fetch
+		let networkError: unknown
+		try {
+			await mobileLogin('staff@example.com', 'private-password', 'device-a')
+		} catch (caught) {
+			networkError = caught
+		}
+		expect(networkError).toMatchObject({ status: 0, code: 'NETWORK_UNAVAILABLE' })
+		expect(mobileLoginErrorMessage(networkError)).toBe('Не удалось связаться с сервером. Проверьте подключение и повторите попытку.')
+
+		globalThis.fetch = (async () => new Response(JSON.stringify({ error: { code: 'RATE_LIMITED', message: 'limited' } }), { status: 429 })) as unknown as typeof fetch
+		let limitedError: unknown
+		try {
+			await mobileLogin('staff@example.com', 'private-password', 'device-a')
+		} catch (caught) {
+			limitedError = caught
+		}
+		expect(limitedError).toMatchObject({ status: 429, code: 'RATE_LIMITED' })
+		expect(mobileLoginErrorMessage(limitedError)).toBe('Слишком много попыток. Повторите вход позже.')
 	})
 
 	test('forwards bearer credentials and validates the profile response', async () => {
@@ -75,6 +130,18 @@ describe('mobile API client', () => {
 			if (configured === undefined) delete process.env.EXPO_PUBLIC_API_URL
 			else process.env.EXPO_PUBLIC_API_URL = configured
 		}
+	})
+
+	test('allows an explicitly enabled private LAN HTTP origin only in development', () => {
+		expect(resolveApiOrigin('http://192.168.0.16:3000', { development: true, allowInsecureHttp: true })).toBe('http://192.168.0.16:3000')
+		expect(() => resolveApiOrigin('http://192.168.0.16:3000', { development: true, allowInsecureHttp: false })).toThrow()
+		expect(() => resolveApiOrigin('http://192.168.0.16:3000', { development: false, allowInsecureHttp: true })).toThrow()
+		expect(() => resolveApiOrigin('http://8.8.8.8:3000', { development: true, allowInsecureHttp: true })).toThrow()
+	})
+
+	test('always accepts HTTPS and rejects HTTP in production', () => {
+		expect(resolveApiOrigin('https://staging-api.example.com', { development: false, allowInsecureHttp: false })).toBe('https://staging-api.example.com')
+		expect(() => resolveApiOrigin('http://127.0.0.1:3000', { development: false, allowInsecureHttp: true })).toThrow()
 	})
 
 	test('uses staff quiz and attempt endpoints with shared response validation', async () => {
