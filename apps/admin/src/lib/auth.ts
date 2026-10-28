@@ -12,6 +12,8 @@ import {
 import { CSRF_COOKIE_NAME, SESSION_COOKIE_NAME } from './auth-constants'
 
 const AUTH_API_PREFIX = '/api/v1/auth/'
+const MANAGEMENT_API_PREFIXES = ['/api/v1/users', '/api/v1/stores']
+const ACTIVATION_API_PREFIX = '/api/v1/auth/activation'
 const NO_STORE_HEADERS = {
 	'Cache-Control': 'private, no-store, max-age=0',
 	Pragma: 'no-cache',
@@ -63,20 +65,24 @@ function getApiBaseUrl(): string {
 }
 
 function getApiUrl(path: string): string {
-	if (!path.startsWith(AUTH_API_PREFIX)) throw new Error('Only authentication API paths may be proxied')
+	const pathname = path.split('?', 1)[0]
+	const allowed = pathname.startsWith(AUTH_API_PREFIX) || pathname === ACTIVATION_API_PREFIX || MANAGEMENT_API_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+	if (!allowed) throw new Error('This API path is not allowed through the BFF')
 	return `${getApiBaseUrl()}${path}`
 }
 
-export async function fetchAuthApi(
-	path: string,
-	options: {
-		method?: 'GET' | 'POST'
-		body?: string
-		cookieHeader?: string | null
-		csrfToken?: string | null
-		userAgent?: string | null
-	} = {},
-): Promise<Response> {
+type ApiMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE'
+
+export interface BffFetchOptions {
+	method?: ApiMethod
+	body?: string
+	cookieHeader?: string | null
+	csrfToken?: string | null
+	userAgent?: string | null
+}
+
+export async function fetchBffApi(path: string, options: BffFetchOptions = {}): Promise<Response> {
+	const method = options.method ?? 'GET'
 	const headers = new Headers({ Accept: 'application/json' })
 	if (options.body) headers.set('Content-Type', 'application/json')
 	if (options.cookieHeader) headers.set('Cookie', options.cookieHeader)
@@ -84,11 +90,53 @@ export async function fetchAuthApi(
 	if (options.userAgent) headers.set('User-Agent', options.userAgent)
 
 	return fetch(getApiUrl(path), {
-		method: options.method ?? 'GET',
+		method,
 		headers,
 		body: options.body,
 		cache: 'no-store',
 	})
+}
+
+export async function fetchAuthApi(path: string, options: BffFetchOptions = {}): Promise<Response> {
+	if (!path.startsWith(AUTH_API_PREFIX)) throw new Error('Only authentication API paths may be fetched here')
+	return fetchBffApi(path, options)
+}
+
+export async function fetchManagementApi(path: string, options: BffFetchOptions = {}): Promise<Response> {
+	const pathname = path.split('?', 1)[0]
+	const allowed = pathname === ACTIVATION_API_PREFIX || MANAGEMENT_API_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+	if (!allowed) throw new Error('Only management API paths may be fetched here')
+	return fetchBffApi(path, options)
+}
+
+/*
+	This helper is intentionally the only place where the browser's session
+	cookie is copied to the upstream API. The BFF never forwards arbitrary
+	cookies or exposes the session token to client JavaScript.
+*/
+export function getManagementRequestOptions(request: Request, options: { body?: string; method: ApiMethod }): BffFetchOptions {
+	return {
+		method: options.method,
+		body: options.body,
+		cookieHeader: getSessionCookieHeader(request.headers.get('cookie')),
+		csrfToken: request.headers.get('x-csrf-token'),
+		userAgent: request.headers.get('user-agent'),
+	}
+}
+
+/*
+	Keep this local request builder explicit for authentication routes too. It
+	avoids accidental widening of cookie forwarding if a new browser cookie is
+	added later.
+*/
+export function getAuthRequestOptions(request: Request, options: { body?: string; method: ApiMethod }): BffFetchOptions {
+	return {
+		method: options.method,
+		body: options.body,
+		cookieHeader: getSessionCookieHeader(request.headers.get('cookie')),
+		csrfToken: request.headers.get('x-csrf-token'),
+		userAgent: request.headers.get('user-agent'),
+	}
 }
 
 async function readJson(response: Response): Promise<unknown> {
@@ -129,10 +177,10 @@ function copyAuthSetCookies(response: NextResponse, upstream: Response): void {
 	}
 }
 
-export async function forwardAuthResponse<T>(
+export async function forwardBffResponse<T>(
 	upstream: Response,
 	schema: SafeParseSchema<T>,
-	options: { forwardSetCookies?: boolean } = {},
+	options: { forwardSetCookies?: boolean; invalidResponseMessage?: string; fallbackErrorCode?: string; fallbackErrorMessage?: string } = {},
 ): Promise<NextResponse> {
 	const payload = await readJson(upstream)
 
@@ -143,8 +191,8 @@ export async function forwardAuthResponse<T>(
 				? parsedError.data
 				: errorResponseSchema.parse({
 						error: {
-							code: upstream.status === 401 ? 'UNAUTHENTICATED' : 'AUTH_REQUEST_FAILED',
-							message: 'Authentication request failed',
+							code: upstream.status === 401 ? 'UNAUTHENTICATED' : options.fallbackErrorCode ?? 'AUTH_REQUEST_FAILED',
+							message: options.fallbackErrorMessage ?? 'Authentication request failed',
 						},
 				}),
 			{ status: upstream.status, headers: NO_STORE_HEADERS },
@@ -154,15 +202,27 @@ export async function forwardAuthResponse<T>(
 	}
 
 	const parsed = schema.safeParse(payload)
-	if (!parsed.success) return jsonError(502, 'AUTH_BACKEND_INVALID_RESPONSE', 'Сервис авторизации вернул некорректный ответ')
+	if (!parsed.success) return jsonError(502, 'AUTH_BACKEND_INVALID_RESPONSE', options.invalidResponseMessage ?? 'Сервис авторизации вернул некорректный ответ')
 
 	const response = NextResponse.json(parsed.data, { status: upstream.status, headers: NO_STORE_HEADERS })
 	if (options.forwardSetCookies) copyAuthSetCookies(response, upstream)
 	return response
 }
 
+export async function forwardAuthResponse<T>(
+	upstream: Response,
+	schema: SafeParseSchema<T>,
+	options: { forwardSetCookies?: boolean; invalidResponseMessage?: string; fallbackErrorCode?: string; fallbackErrorMessage?: string } = {},
+): Promise<NextResponse> {
+	return forwardBffResponse(upstream, schema, options)
+}
+
 export function backendUnavailableResponse(): NextResponse {
 	return jsonError(503, 'AUTH_BACKEND_UNAVAILABLE', 'Сервис авторизации временно недоступен')
+}
+
+export function managementUnavailableResponse(): NextResponse {
+	return jsonError(503, 'MANAGEMENT_BACKEND_UNAVAILABLE', 'Сервис управления временно недоступен')
 }
 
 export async function getCurrentUser(cookieHeader: string | null | undefined): Promise<{

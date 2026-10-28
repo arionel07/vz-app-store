@@ -273,6 +273,81 @@ suite("Authentication PostgreSQL integration", () => {
     const listed = await usersResponse.json();
     expect(listed.data.some((user: { id: string }) => user.id === staffAId)).toBe(true);
     expect(listed.data.some((user: { id: string }) => user.id === staffBId)).toBe(false);
+
+    const storesResponse = await app.request("http://localhost/api/v1/stores?page=1&pageSize=20", { headers: { Cookie: cookie } });
+    expect(storesResponse.status).toBe(200);
+    const visibleStores = await storesResponse.json();
+    expect(visibleStores.data.some((store: { id: string }) => store.id === storeAId)).toBe(true);
+    expect(visibleStores.data.some((store: { id: string }) => store.id === storeBId)).toBe(false);
+
+    const csrfFailure = await app.request("http://localhost/api/v1/users", {
+      method: "POST",
+      headers: { Cookie: cookie, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: "HTTP",
+        lastName: "No CSRF",
+        phone: `+373691${Date.now().toString().slice(-4)}99`,
+        email: null,
+        role: "staff",
+        isActive: true,
+        storeIds: [storeAId],
+      }),
+    });
+    expect(csrfFailure.status).toBe(403);
+
+    const createResponse = await app.request("http://localhost/api/v1/users", {
+      method: "POST",
+      headers: { Cookie: cookie, "X-CSRF-Token": cookieValue(cookieHeader, "vizaje_csrf"), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: "HTTP",
+        lastName: "Managed",
+        phone: `+373691${Date.now().toString().slice(-4)}98`,
+        email: null,
+        role: "staff",
+        isActive: true,
+        storeIds: [storeAId],
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const created = await createResponse.json();
+    expect(created.storeIds).toEqual([storeAId]);
+
+    const updateResponse = await app.request(`http://localhost/api/v1/users/${created.id}`, {
+      method: "PATCH",
+      headers: { Cookie: cookie, "X-CSRF-Token": cookieValue(cookieHeader, "vizaje_csrf"), "Content-Type": "application/json" },
+      body: JSON.stringify({ lastName: "Updated" }),
+    });
+    expect(updateResponse.status).toBe(200);
+    expect((await updateResponse.json()).lastName).toBe("Updated");
+
+    const crossStoreAssignment = await app.request(`http://localhost/api/v1/users/${created.id}/stores/${storeBId}`, {
+      method: "POST",
+      headers: { Cookie: cookie, "X-CSRF-Token": cookieValue(cookieHeader, "vizaje_csrf") },
+    });
+    expect(crossStoreAssignment.status).toBe(403);
+
+    const managerStoreCreate = await app.request("http://localhost/api/v1/stores", {
+      method: "POST",
+      headers: { Cookie: cookie, "X-CSRF-Token": cookieValue(cookieHeader, "vizaje_csrf"), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Not Allowed", code: `NO-${Date.now()}` }),
+    });
+    expect(managerStoreCreate.status).toBe(403);
+
+    const activationResponse = await app.request("http://localhost/api/v1/auth/activation", {
+      method: "POST",
+      headers: { Cookie: cookie, "X-CSRF-Token": cookieValue(cookieHeader, "vizaje_csrf"), "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: staffAId, storeId: storeAId }),
+    });
+    expect(activationResponse.status).toBe(201);
+    expect((await activationResponse.json()).activationPayload).toContain("vizaje://activate?");
+
+    const removeResponse = await app.request(`http://localhost/api/v1/users/${created.id}/stores/${storeAId}`, {
+      method: "DELETE",
+      headers: { Cookie: cookie, "X-CSRF-Token": cookieValue(cookieHeader, "vizaje_csrf") },
+    });
+    expect(removeResponse.status).toBe(200);
+    await db.delete(activationTokens).where(eq(activationTokens.userId, created.id));
+    await db.delete(users).where(eq(users.id, created.id));
   });
 });
 

@@ -109,24 +109,28 @@ function AccountMenu() {
 export function AdminShell({ children }: { children: ReactNode }) {
 	const pathname = usePathname()
 	const isOverview = pathname === '/' || pathname === '/design-system'
+	const router = useRouter()
 
 	return (
 		<div className="admin-shell">
 			<aside className="sidebar">
-				<div className="sidebar-brand"><Leaf size={17} strokeWidth={2.2} /><strong>Vizaje</strong><ChevronRight size={14} className="brand-chevron" /><button type="button" className="sidebar-search" aria-label="Поиск" onClick={() => toast.info('Поиск откроется по сочетанию ⌘ K')}><Search size={15} /></button><button type="button" className="sidebar-compose" aria-label="Создать" onClick={() => toast.info('Создание будет доступно после подключения API')}><Plus size={15} /></button></div>
+				<div className="sidebar-brand"><Leaf size={17} strokeWidth={2.2} /><strong>Vizaje</strong><ChevronRight size={14} className="brand-chevron" /><button type="button" className="sidebar-search" aria-label="Поиск" onClick={() => toast.info('Поиск откроется по сочетанию ⌘ K')}><Search size={15} /></button><button type="button" className="sidebar-compose" aria-label="Создать" onClick={() => toast.info('Создание доступно в разделах «Сотрудники» и «Магазины»')}><Plus size={15} /></button></div>
 				<nav className="sidebar-nav" aria-label="Основная навигация">
 					<p className="sidebar-label">Рабочая область</p>
 					{navItems.map(({ label, icon: Icon, value }) => {
-						const active = value === 'overview' && isOverview
+						const path = value === 'overview' ? '/' : `/${value}`
+						const active = value === 'overview' ? isOverview : pathname.startsWith(path)
+						const implemented = value === 'overview' || value === 'employees' || value === 'stores'
 						return <button key={value} type="button" className={cn('nav-item', active && 'nav-item-active')} onClick={() => {
-							if (!active) toast.info(`${label}: раздел будет доступен после подключения API`)
+							if (implemented) router.push(path)
+							else toast.info(`${label}: раздел будет доступен позже`)
 						}}><Icon size={17} strokeWidth={1.8} /><span>{label}</span>{active && <span className="nav-active-dot" />}</button>
 					})}
 				</nav>
 				<div className="sidebar-bottom">
 					<button type="button" className="nav-item" onClick={() => toast.info('Настройки будут доступны позже')}><Settings size={17} strokeWidth={1.8} /><span>Настройки</span></button>
 					<div className="sidebar-rule" />
-					<p className="sidebar-footnote">Демонстрационный режим</p>
+					<p className="sidebar-footnote">API подключён</p>
 				</div>
 			</aside>
 			<main className="app-main">

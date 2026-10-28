@@ -298,4 +298,62 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .inspector-activity li svg { color: var(--tertiary); }.inspector-activity li time { color: var(--tertiary); font-size: 9px; white-space: nowrap; }.activity-dot { width: 6px; height: 6px; margin-left: 5px; border-radius: 50%; background: #20b878; }
 .demo-footer { padding-top: 15px; }
 
+.management-page { padding-bottom: 20px; }
+.management-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 14px; }
+.management-toolbar-actions { display: flex; align-items: center; gap: 8px; }
+.management-filters { display: grid; grid-template-columns: minmax(250px, 1fr) 150px 150px; gap: 8px; margin-bottom: 12px; }
+.management-surface { overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.management-table { min-width: 820px; }
+.management-table th, .management-table td { padding: 11px 12px; }
+.management-table th:first-child, .management-table td:first-child { padding-left: 16px; }
+.management-table th:last-child, .management-table td:last-child { padding-right: 16px; }
+.management-table tbody tr { cursor: pointer; }
+.management-table tbody tr:hover { background: color-mix(in srgb, var(--surface-raised) 48%, transparent); }
+.management-table tbody tr[aria-selected="true"] { background: color-mix(in srgb, var(--brand-blue) 8%, var(--surface)); }
+.management-table .actions-cell { text-align: right; }
+.management-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 12px; align-items: start; }
+.management-inspector { position: sticky; top: 12px; }
+.management-inspector .panel-header { padding-bottom: 14px; }
+.management-inspector .panel-content { display: grid; gap: 14px; }
+.management-meta { display: grid; gap: 8px; margin: 0; }
+.management-meta div { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.management-meta dt { color: var(--muted-foreground); }
+.management-meta dd { margin: 0; text-align: right; }
+.management-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.management-pagination { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); padding: 10px 16px; color: var(--muted-foreground); font-size: 11px; }
+.management-pagination-actions { display: flex; align-items: center; gap: 4px; }
+.management-pagination-actions button { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid transparent; border-radius: 7px; background: transparent; color: inherit; }
+.management-pagination-actions button:hover:not(:disabled), .management-pagination-actions button[aria-current="page"] { border-color: var(--border); background: var(--surface-raised); color: var(--foreground); }
+.management-state { display: grid; min-height: 220px; place-items: center; padding: 34px; text-align: center; }
+.management-state p { max-width: 370px; margin: 7px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.management-state strong { font-size: 14px; }
+.management-error { border: 1px solid color-mix(in srgb, var(--destructive) 32%, var(--border)); border-radius: 9px; background: color-mix(in srgb, var(--destructive) 7%, var(--surface)); color: var(--destructive); padding: 11px 13px; font-size: 12px; }
+.management-error button { margin-left: 10px; border: 0; background: transparent; color: inherit; font-weight: 600; text-decoration: underline; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.form-field { display: grid; gap: 6px; }
+.form-field-full { grid-column: 1 / -1; }
+.form-field label, .form-field legend { color: var(--muted-foreground); font-size: 11px; }
+.form-field fieldset { display: grid; gap: 8px; margin: 0; border: 0; padding: 0; }
+.field-error { color: var(--destructive); font-size: 11px; }
+.form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border); margin-top: 16px; padding-top: 14px; }
+.dialog-form { display: grid; gap: 2px; }
+.store-checklist { display: grid; max-height: 170px; gap: 6px; overflow-y: auto; border: 1px solid var(--border); border-radius: 9px; padding: 8px; }
+.store-check { display: flex; align-items: center; gap: 8px; border-radius: 6px; padding: 6px; font-size: 12px; }
+.store-check:hover { background: var(--surface-raised); }
+.store-check input { accent-color: var(--brand-blue); }
+.qr-activation-content { display: grid; justify-items: center; gap: 10px; text-align: center; }
+.qr-canvas-wrap { display: grid; min-width: 242px; min-height: 242px; place-items: center; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 10px; }
+.qr-canvas-wrap svg { display: block; width: 220px; height: 220px; max-width: 220px; fill: var(--foreground); }
+.qr-expiration { margin: 0; font-size: 12px; font-weight: 600; }
+.qr-caption { max-width: 310px; margin: 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.5; }
+.employee-name-cell { display: flex; align-items: center; gap: 9px; }
+.employee-name-cell strong { font-weight: 600; }
+.employee-name-cell small { display: block; margin-top: 2px; color: var(--muted-foreground); font-size: 10px; }
+.role-note { margin: 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.4; }
+
+@media (max-width: 1180px) {
+	.management-grid { grid-template-columns: minmax(0, 1fr) 300px; }
+	.management-filters { grid-template-columns: minmax(210px, 1fr) 135px 135px; }
+}
+
 @media (max-width: 1280px) { .workspace-layout { grid-template-columns: minmax(0, 1fr) 310px; }.workspace-actions .sort-button { max-width: 145px; overflow: hidden; white-space: nowrap; }.workspace-actions .sort-button svg:last-child { flex: 0 0 auto; }.workspace-header { gap: 6px; }.workspace-tab { padding-right: 6px; padding-left: 6px; } }
