@@ -18,13 +18,14 @@ export function Screen({ children, scroll = true, keyboardAware = false, content
 	return keyboardAware ? <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>{screen}</KeyboardAvoidingView> : screen
 }
 
-export function ScreenHeader({ title, subtitle, back = false, backFallback, action }: { title: string; subtitle?: string; back?: boolean; backFallback?: Href; action?: ReactNode }) {
+export function ScreenHeader({ title, back = false, backFallback, action }: { title: string; back?: boolean; backFallback?: Href; action?: ReactNode }) {
 	const router = useRouter()
 	const { colors } = useAppTheme()
 	const canGoBack = router.canGoBack()
 	const fallback = backFallback ?? '/(tabs)'
 	return <View style={styles.header}>
-		<View style={styles.headerTitleRow}>{back && <Pressable accessibilityLabel="Назад" hitSlop={10} disabled={!canGoBack && !backFallback} onPress={() => goBackOrReplace(router, fallback)} style={[styles.backButton, !canGoBack && !backFallback && styles.backButtonDisabled]}><ChevronLeft size={24} color={colors.text} /></Pressable>}<View style={styles.headerCopy}><Text style={[styles.eyebrow, { color: colors.muted }]}>VIZAJE STAFF</Text><Text style={[styles.heading, { color: colors.text }]}>{title}</Text>{subtitle && <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text>}</View></View>{action}</View>
+		<View style={styles.headerTitleRow}>{back && <Pressable accessibilityLabel="Назад" hitSlop={10} disabled={!canGoBack && !backFallback} onPress={() => goBackOrReplace(router, fallback)} style={[styles.backButton, !canGoBack && !backFallback && styles.backButtonDisabled]}><ChevronLeft size={24} color={colors.text} /></Pressable>}<View style={styles.headerCopy}><Text style={[styles.heading, { color: colors.text }]}>{title}</Text></View></View>{action}
+	</View>
 }
 
 export function SectionTitle({ children, right }: PropsWithChildren<{ right?: ReactNode }>) {
@@ -89,9 +90,7 @@ const styles = StyleSheet.create({
 	headerCopy: { flex: 1 },
 	backButton: { marginTop: 8, padding: 2 },
 	backButtonDisabled: { opacity: 0.35 },
-	eyebrow: { fontSize: 11, fontWeight: '600', letterSpacing: 1.3 },
-	heading: { marginTop: 5, fontSize: 30, fontWeight: '600', letterSpacing: -0.8 },
-	subtitle: { marginTop: 6, fontSize: 15, lineHeight: 21 },
+	heading: { fontSize: 28, fontWeight: '600', letterSpacing: -0.8 },
 	sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
 	sectionHeading: { fontSize: 21, fontWeight: '600', letterSpacing: -0.25 },
 	card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 20, padding: 18 },

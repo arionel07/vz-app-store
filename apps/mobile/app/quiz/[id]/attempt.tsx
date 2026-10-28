@@ -107,17 +107,17 @@ export default function QuizAttemptScreen() {
 		])
 	}
 
-	if (loading) return <Screen><ScreenHeader title="Тест" subtitle="Восстанавливаем попытку." back backFallback="/(tabs)/quizzes" /><View style={styles.loading}><ActivityIndicator color={colors.text} /><Text style={[styles.muted, { color: colors.muted }]}>Загружаем вопросы…</Text></View></Screen>
-	if (error && (!quiz || !attempt)) return <Screen><ScreenHeader title="Тест" subtitle="Попытка недоступна." back backFallback="/(tabs)/quizzes" /><InlineMessage title="Не удалось открыть попытку" body={error} actionLabel="Повторить" onAction={() => void load()} /></Screen>
+	if (loading) return <Screen><ScreenHeader title="Тест" back backFallback="/(tabs)/quizzes" /><View style={styles.loading}><ActivityIndicator color={colors.text} /><Text style={[styles.muted, { color: colors.muted }]}>Загружаем вопросы…</Text></View></Screen>
+	if (error && (!quiz || !attempt)) return <Screen><ScreenHeader title="Тест" back backFallback="/(tabs)/quizzes" /><InlineMessage title="Не удалось открыть попытку" body={error} actionLabel="Повторить" onAction={() => void load()} /></Screen>
 	if (!quiz || !attempt) return null
 
 	const question = quiz.questions[questionIndex]
-	if (!question) return <Screen><ScreenHeader title="Тест" subtitle="Вопросы не найдены." back backFallback="/(tabs)/quizzes" /><InlineMessage title="Тест пуст" body="В этой ревизии нет вопросов для прохождения." /></Screen>
+	if (!question) return <Screen><ScreenHeader title="Тест" back backFallback="/(tabs)/quizzes" /><InlineMessage title="Тест пуст" body="В этой ревизии нет вопросов для прохождения." /></Screen>
 	const selectedOption = answers[question.id]
 	const isLast = questionIndex === quiz.questions.length - 1
 
 	return <Screen contentStyle={styles.content}>
-		<ScreenHeader title="Тест" subtitle={`Вопрос ${questionIndex + 1} из ${quiz.questions.length}`} back backFallback="/(tabs)/quizzes" />
+		<ScreenHeader title="Тест" back backFallback="/(tabs)/quizzes" />
 		<View style={styles.progressHeader}><Text style={[styles.progressText, { color: colors.muted }]}>Прогресс</Text><Text style={[styles.progressText, { color: colors.text }]}>{progressPercent(questionIndex, quiz.questions.length)}%</Text></View>
 		<ProgressBar value={progressPercent(questionIndex, quiz.questions.length)} />
 		<Card style={styles.questionCard}><Text style={[styles.questionNumber, { color: colors.muted }]}>Вопрос {questionIndex + 1}</Text><Text accessibilityRole="header" style={[styles.questionText, { color: colors.text }]}>{question.prompt}</Text></Card>

@@ -21,7 +21,7 @@ export default function HomeScreen() {
 	const storeCount = user?.assignedStores.length ?? 0
 
 	return <Screen>
-		<View style={styles.headerRow}><View style={styles.headerCopy}><Text style={[styles.kicker, { color: colors.muted }]}>VIZAJE STAFF</Text><Text style={[styles.title, { color: colors.text }]}>{greetingText}, {user?.firstName ?? 'коллега'}</Text><Text style={[styles.subtitle, { color: colors.muted }]}>Всё нужное для рабочего дня — в одном месте.</Text></View><IconAction icon={UserRound} label="Открыть профиль" onPress={() => router.push('/profile')} /></View>
+		<View style={styles.headerRow}><View style={styles.headerCopy}><Text style={[styles.title, { color: colors.text }]}>{greetingText}, {user?.firstName ?? 'коллега'}</Text></View><IconAction icon={UserRound} label="Открыть профиль" onPress={() => router.push('/profile')} /></View>
 
 		<View style={styles.actions}><ActionButton label="Открыть тесты" icon={ClipboardCheck} onPress={() => router.push('/(tabs)/quizzes')} /><ActionButton label="Добавить фото" icon={Camera} variant="secondary" onPress={() => router.push('/(tabs)/photos')} /></View>
 
@@ -33,9 +33,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
 	headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
 	headerCopy: { flex: 1, gap: 7 },
-	kicker: { fontSize: 11, fontWeight: '600', letterSpacing: 1.4 },
-	title: { fontSize: 30, fontWeight: '600', letterSpacing: -0.8 },
-	subtitle: { fontSize: 16, lineHeight: 23 },
+	title: { fontSize: 28, fontWeight: '600', letterSpacing: -0.8 },
 	actions: { gap: 12, paddingTop: 8 },
 	statusRow: { flexDirection: 'row', alignItems: 'center', gap: 13, borderRadius: 20, padding: 16 },
 	statusIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },

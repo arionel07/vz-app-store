@@ -208,7 +208,7 @@ export default function PhotosScreen() {
 	const storeName = useCallback((storeId: string) => stores.find((store) => store.id === storeId)?.name ?? 'Магазин', [stores])
 
 	return <Screen refreshing={historyRefreshing} onRefresh={refreshHistory}>
-		<ScreenHeader title="Фото" subtitle="Рабочие фотографии и история загрузок." />
+		<ScreenHeader title="Фото" />
 
 		{stores.length > 1 && <Card style={styles.storeCard}>
 			<View style={styles.storeHeading}><Store size={19} color={colors.text} /><Text style={[styles.cardTitle, { color: colors.text }]}>Магазин для загрузки</Text></View>

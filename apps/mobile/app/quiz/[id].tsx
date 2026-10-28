@@ -67,9 +67,9 @@ export default function QuizIntroductionScreen() {
 	}
 
 	return <Screen>
-		<ScreenHeader title="О тесте" subtitle="Внимательно прочитайте условия перед началом." back backFallback="/(tabs)/quizzes" />
+		<ScreenHeader title="О тесте" back backFallback="/(tabs)/quizzes" />
 		{loading ? <View style={styles.loading}><ActivityIndicator color={colors.text} /><Text style={[styles.muted, { color: colors.muted }]}>Загружаем тест…</Text></View> : error && !quiz ? <InlineMessage title="Тест недоступен" body={error} actionLabel="Повторить" onAction={() => void load()} /> : quiz && <>
-			<Card><View style={[styles.icon, { backgroundColor: colors.accentSoft }]}><BookOpen color={colors.accent} size={24} /></View><Text style={[styles.title, { color: colors.text }]}>{quiz.title}</Text>{quiz.description && <Text style={[styles.description, { color: colors.muted }]}>{quiz.description}</Text>}<View style={[styles.meta, { borderTopColor: colors.border }]}><View><Text style={[styles.metaLabel, { color: colors.muted }]}>Вопросы</Text><Text style={[styles.metaValue, { color: colors.text }]}>{questionLabel(quiz.questions.length)}</Text></View><View><Text style={[styles.metaLabel, { color: colors.muted }]}>Проходной балл</Text><Text style={[styles.metaValue, { color: colors.text }]}>{quiz.passingScore}%</Text></View><View><Text style={[styles.metaLabel, { color: colors.muted }]}>Ревизия</Text><Text style={[styles.metaValue, { color: colors.text }]}>{quiz.revisionNumber}</Text></View></View></Card>
+			<Card><View style={[styles.icon, { backgroundColor: colors.accentSoft }]}><BookOpen color={colors.accent} size={24} /></View><Text style={[styles.title, { color: colors.text }]}>{quiz.title}</Text><View style={[styles.meta, { borderTopColor: colors.border }]}><View><Text style={[styles.metaLabel, { color: colors.muted }]}>Вопросы</Text><Text style={[styles.metaValue, { color: colors.text }]}>{questionLabel(quiz.questions.length)}</Text></View><View><Text style={[styles.metaLabel, { color: colors.muted }]}>Проходной балл</Text><Text style={[styles.metaValue, { color: colors.text }]}>{quiz.passingScore}%</Text></View><View><Text style={[styles.metaLabel, { color: colors.muted }]}>Ревизия</Text><Text style={[styles.metaValue, { color: colors.text }]}>{quiz.revisionNumber}</Text></View></View></Card>
 			{error && <View style={[styles.warning, { backgroundColor: colors.surfaceRaised }]}><CircleAlert color={colors.warning} size={19} /><Text style={[styles.warningText, { color: colors.text }]}>{error}</Text></View>}
 			<ActionButton label={starting ? 'Подготавливаем…' : activeAttemptId ? 'Продолжить попытку' : 'Начать тест'} icon={starting ? undefined : Play} disabled={starting} onPress={() => void (activeAttemptId ? openAttempt(activeAttemptId) : start())} />
 		</>}
@@ -80,8 +80,7 @@ const styles = StyleSheet.create({
 	loading: { minHeight: 160, alignItems: 'center', justifyContent: 'center', gap: 12 },
 	muted: { fontSize: 14, lineHeight: 20 },
 	icon: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 16, marginBottom: 14 },
-	title: { fontSize: 26, fontWeight: '600', lineHeight: 32 },
-	description: { marginTop: 10, fontSize: 15, lineHeight: 22 },
+	title: { fontSize: 24, fontWeight: '600', lineHeight: 30 },
 	meta: { flexDirection: 'row', gap: 18, marginTop: 24, paddingTop: 17, borderTopWidth: StyleSheet.hairlineWidth },
 	metaLabel: { fontSize: 12 },
 	metaValue: { marginTop: 4, fontSize: 15, fontWeight: '700' },
