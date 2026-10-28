@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const quizLifecycleSchema = z.enum(["draft", "published", "archived"]);
+export type QuizLifecycle = z.infer<typeof quizLifecycleSchema>;
 export const quizRevisionStatusSchema = z.enum(["draft", "published", "archived"]);
 export const quizAssignmentModeSchema = z.enum(["all", "selected"]);
 export const quizAttemptStatusSchema = z.enum(["in_progress", "submitted"]);
@@ -153,6 +154,8 @@ export const resultListResponseSchema = z.object({
   data: z.array(resultResponseSchema),
   pagination: z.object({ page: z.number(), pageSize: z.number(), total: z.number(), totalPages: z.number() }),
 });
+
+export const quizArchiveResponseSchema = z.object({ success: z.literal(true) });
 
 export type QuizCreateInput = z.input<typeof quizCreateInputSchema>;
 export type QuizDraftInput = z.input<typeof quizDraftInputSchema>;

@@ -12,7 +12,7 @@ import {
 import { CSRF_COOKIE_NAME, SESSION_COOKIE_NAME } from './auth-constants'
 
 const AUTH_API_PREFIX = '/api/v1/auth/'
-const MANAGEMENT_API_PREFIXES = ['/api/v1/users', '/api/v1/stores']
+const MANAGEMENT_API_PREFIXES = ['/api/v1/users', '/api/v1/stores', '/api/v1/management/quizzes']
 const ACTIVATION_API_PREFIX = '/api/v1/auth/activation'
 const NO_STORE_HEADERS = {
 	'Cache-Control': 'private, no-store, max-age=0',
@@ -71,7 +71,7 @@ function getApiUrl(path: string): string {
 	return `${getApiBaseUrl()}${path}`
 }
 
-type ApiMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE'
+type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export interface BffFetchOptions {
 	method?: ApiMethod
