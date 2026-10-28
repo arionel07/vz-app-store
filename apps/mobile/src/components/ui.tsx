@@ -1,17 +1,18 @@
 import { useRouter } from 'expo-router'
 import { ChevronLeft, type LucideIcon } from 'lucide-react-native'
 import { useMemo, type PropsWithChildren, type ReactNode } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native'
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppTheme } from '../theme'
 
-type ScreenProps = PropsWithChildren<{ scroll?: boolean; contentStyle?: StyleProp<ViewStyle> }>
+type ScreenProps = PropsWithChildren<{ scroll?: boolean; contentStyle?: StyleProp<ViewStyle>; refreshing?: boolean; onRefresh?: () => void }>
 
-export function Screen({ children, scroll = true, contentStyle }: ScreenProps) {
+export function Screen({ children, scroll = true, contentStyle, refreshing, onRefresh }: ScreenProps) {
 	const { colors } = useAppTheme()
 	const insets = useSafeAreaInsets()
 	const screenContentStyle = [styles.screenContent, { paddingBottom: Math.max(insets.bottom, 20) }, contentStyle]
-	return scroll ? <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={screenContentStyle} showsVerticalScrollIndicator={false}>{children}</ScrollView> : <View style={[styles.screen, { backgroundColor: colors.background }]}><View style={screenContentStyle}>{children}</View></View>
+	const refreshControl = refreshing !== undefined && onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} /> : undefined
+	return scroll ? <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={screenContentStyle} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>{children}</ScrollView> : <View style={[styles.screen, { backgroundColor: colors.background }]}><View style={screenContentStyle}>{children}</View></View>
 }
 
 export function ScreenHeader({ title, subtitle, back = false, action }: { title: string; subtitle?: string; back?: boolean; action?: ReactNode }) {
@@ -63,6 +64,16 @@ export function SessionStatusScreen({ title, body, actionLabel, onAction, loadin
 	</View>
 }
 
+export function ProgressBar({ value }: { value: number }) {
+	const { colors } = useAppTheme()
+	return <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: value }} style={[styles.progressTrack, { backgroundColor: colors.surfaceRaised }]}><View style={[styles.progressValue, { backgroundColor: colors.accent, width: `${Math.max(0, Math.min(100, value))}%` }]} /></View>
+}
+
+export function InlineMessage({ title, body, actionLabel, onAction }: { title: string; body: string; actionLabel?: string; onAction?: () => void }) {
+	const { colors } = useAppTheme()
+	return <View style={[styles.inlineMessage, { backgroundColor: colors.surfaceRaised }]}><Text style={[styles.inlineMessageTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.inlineMessageBody, { color: colors.muted }]}>{body}</Text>{actionLabel && onAction && <ActionButton label={actionLabel} variant="secondary" onPress={onAction} />}</View>
+}
+
 const styles = StyleSheet.create({
 	screen: { flex: 1 },
 	screenContent: { paddingHorizontal: 20, paddingTop: 18, gap: 24 },
@@ -92,4 +103,9 @@ const styles = StyleSheet.create({
 	sessionStatusTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center' },
 	sessionStatusBody: { maxWidth: 330, fontSize: 15, lineHeight: 22, textAlign: 'center' },
 	sessionStatusAction: { width: '100%', marginTop: 4 },
+	progressTrack: { height: 8, overflow: 'hidden', borderRadius: 999 },
+	progressValue: { height: '100%', borderRadius: 999 },
+	inlineMessage: { gap: 8, borderRadius: 16, padding: 16 },
+	inlineMessageTitle: { fontSize: 16, fontWeight: '700' },
+	inlineMessageBody: { fontSize: 14, lineHeight: 20 },
 })

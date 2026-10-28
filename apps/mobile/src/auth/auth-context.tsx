@@ -31,6 +31,7 @@ type AuthContextValue = {
 	redeemActivation: (secret: string) => Promise<void>
 	retryRestore: () => Promise<void>
 	logout: () => Promise<LogoutResult>
+	requestAuthenticated: <T>(request: (token: string) => Promise<T>, options?: { retryUnauthorized?: boolean }) => Promise<T>
 }
 
 class StorageError extends Error {
@@ -216,6 +217,31 @@ export function AuthProvider({ children }: PropsWithChildren) {
 		return { remoteRevoked, localCleared }
 	}, [clearLocalSession])
 
+	const requestAuthenticated = useCallback(async <T,>(request: (token: string) => Promise<T>, options: { retryUnauthorized?: boolean } = {}): Promise<T> => {
+		const current = sessionRef.current
+		if (!current) throw new ApiError(401, 'UNAUTHENTICATED', 'Сессия не найдена')
+		try {
+			return await request(current.accessToken)
+		} catch (error) {
+			if (!isUnauthorized(error)) throw error
+			if (options.retryUnauthorized === false) {
+				await clearLocalSession()
+				setStatus('unauthenticated')
+				throw error
+			}
+			try {
+				const renewed = await renewCurrentSession()
+				return await request(renewed.accessToken)
+			} catch (renewError) {
+				if (isUnauthorized(renewError)) {
+					await clearLocalSession()
+					setStatus('unauthenticated')
+				}
+				throw renewError
+			}
+		}
+	}, [clearLocalSession, renewCurrentSession])
+
 	const value = useMemo<AuthContextValue>(() => ({
 		status,
 		user,
@@ -223,7 +249,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
 		redeemActivation,
 		retryRestore: restore,
 		logout,
-	}), [errorMessage, logout, redeemActivation, restore, status, user])
+		requestAuthenticated,
+	}), [errorMessage, logout, redeemActivation, requestAuthenticated, restore, status, user])
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

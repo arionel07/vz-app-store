@@ -3,11 +3,23 @@ import {
 	errorResponseSchema,
 	logoutResponseSchema,
 	mobileSessionResponseSchema,
+	staffQuizListResponseSchema,
+	quizStaffResponseSchema,
+	attemptResponseSchema,
+	attemptListResponseSchema,
+	submitAttemptInputSchema,
 	storeListResponseSchema,
 	userResponseSchema,
+	type AttemptListQuery,
+	type AttemptListResponse,
+	type AttemptResponse,
 	type MobileSessionResponse,
+	type QuizListQuery,
+	type QuizStaffResponse,
+	type StaffQuizListResponse,
 	type StoreListQuery,
 	type StoreListResponse,
+	type SubmitAttemptInput,
 	type UserResponse,
 } from '@vizaje/contracts'
 
@@ -123,4 +135,40 @@ export function renewMobileSession(token: string): Promise<MobileSessionResponse
 
 export function logoutMobileSession(token: string): Promise<{ success: true }> {
 	return requestJson('/api/v1/auth/logout', logoutResponseSchema, { method: 'POST', token })
+}
+
+export function listAvailableQuizzes(token: string, query: QuizListQuery = { page: 1, pageSize: 100 }): Promise<{ data: QuizStaffResponse[]; pagination: StaffQuizListResponse['pagination'] }> {
+	const params = new URLSearchParams({
+		page: String(query.page),
+		pageSize: String(query.pageSize),
+		...(query.search ? { search: query.search } : {}),
+	})
+	return requestJson(`/api/v1/quizzes?${params.toString()}`, staffQuizListResponseSchema, { token, allowRetry: true })
+}
+
+export function getAvailableQuiz(token: string, quizId: string): Promise<QuizStaffResponse> {
+	return requestJson(`/api/v1/quizzes/${encodeURIComponent(quizId)}`, quizStaffResponseSchema, { token, allowRetry: true })
+}
+
+export function startQuizAttempt(token: string, quizId: string): Promise<AttemptResponse> {
+	return requestJson(`/api/v1/quizzes/${encodeURIComponent(quizId)}/attempts`, attemptResponseSchema, { method: 'POST', token })
+}
+
+export function submitQuizAttempt(token: string, attemptId: string, input: SubmitAttemptInput): Promise<AttemptResponse> {
+	const body = submitAttemptInputSchema.parse(input)
+	return requestJson(`/api/v1/attempts/${encodeURIComponent(attemptId)}/submit`, attemptResponseSchema, { method: 'POST', token, body })
+}
+
+export function listMyAttempts(token: string, query: AttemptListQuery = { page: 1, pageSize: 100 }): Promise<AttemptListResponse> {
+	const params = new URLSearchParams({
+		page: String(query.page),
+		pageSize: String(query.pageSize),
+		...(query.quizId ? { quizId: query.quizId } : {}),
+		...(query.status ? { status: query.status } : {}),
+	})
+	return requestJson(`/api/v1/attempts?${params.toString()}`, attemptListResponseSchema, { token, allowRetry: true })
+}
+
+export function getMyAttempt(token: string, attemptId: string): Promise<AttemptResponse> {
+	return requestJson(`/api/v1/attempts/${encodeURIComponent(attemptId)}`, attemptResponseSchema, { token, allowRetry: true })
 }

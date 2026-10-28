@@ -39,6 +39,9 @@ export default function RootLayout() {
 			<Stack.Screen name="(tabs)" />
 			<Stack.Screen name="profile" />
 			<Stack.Screen name="activation" />
+			<Stack.Screen name="quiz/[id]" />
+			<Stack.Screen name="quiz/[id]/attempt" />
+			<Stack.Screen name="attempt/[attemptId]" />
 		</Stack></AuthGate>
 	</AuthProvider></AppThemeProvider></SafeAreaProvider>
 }
