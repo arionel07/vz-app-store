@@ -1,13 +1,14 @@
 # Vizaje Staff Mobile
 
-Expo Router foundation for the Vizaje Staff iOS/Android application.
+Expo Router application for the Vizaje Staff iOS/Android application.
 
-Milestone 10.1 is visual-only: the screens use clearly marked demonstration
-content and do not call the API, create sessions, request camera/gallery
-permissions, or persist credentials.
+The app uses the existing Hono API for QR activation and mobile bearer
+sessions. Access tokens are stored only in `expo-secure-store`; no session
+data is kept in AsyncStorage or exposed to screen components.
 
 Run from the repository root with `bun run --cwd apps/mobile start`.
 
 The app uses the system appearance by default and includes a manual theme
-selector on the Profile screen. Native camera, photo library, authentication,
-and production signing configuration are intentionally deferred.
+selector on the Profile screen. QR camera permission is requested only after
+the employee taps the scan action. Quizzes, photos, production signing and
+backend features outside authentication remain deferred.

@@ -46,3 +46,4 @@ export type CreateStoreInput = z.input<typeof createStoreSchema>;
 export type UpdateStoreInput = z.infer<typeof updateStoreSchema>;
 export type StoreListQuery = z.infer<typeof storeListQuerySchema>;
 export type StoreResponse = z.infer<typeof storeResponseSchema>;
+export type StoreListResponse = z.infer<typeof storeListResponseSchema>;

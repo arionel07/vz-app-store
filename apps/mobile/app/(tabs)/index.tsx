@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router'
 import { ArrowRight, Camera, ClipboardCheck, UserRound } from 'lucide-react-native'
 import { useMemo } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { ActionButton, Card, DemoBadge, IconAction, Screen, SectionTitle } from '../../src/components/ui'
+import { ActionButton, Card, IconAction, Screen, SectionTitle } from '../../src/components/ui'
+import { useAuth } from '../../src/auth/auth-context'
 import { useAppTheme } from '../../src/theme'
 
 function greeting(): string {
@@ -15,14 +16,15 @@ function greeting(): string {
 export default function HomeScreen() {
 	const router = useRouter()
 	const { colors } = useAppTheme()
+	const { user } = useAuth()
 	const greetingText = useMemo(greeting, [])
 	return <Screen>
-		<View style={styles.headerRow}><View><Text style={[styles.kicker, { color: colors.muted }]}>VIZAJE STAFF</Text><Text style={[styles.title, { color: colors.text }]}>{greetingText}</Text><Text style={[styles.subtitle, { color: colors.muted }]}>Ваш рабочий день начинается здесь.</Text></View><IconAction icon={UserRound} label="Открыть профиль" onPress={() => router.push('/profile')} /></View>
-		<DemoBadge />
+		<View style={styles.headerRow}><View><Text style={[styles.kicker, { color: colors.muted }]}>VIZAJE STAFF</Text><Text style={[styles.title, { color: colors.text }]}>{greetingText}, {user?.firstName ?? 'коллега'}</Text><Text style={[styles.subtitle, { color: colors.muted }]}>Ваш рабочий день начинается здесь.</Text></View><IconAction icon={UserRound} label="Открыть профиль" onPress={() => router.push('/profile')} /></View>
+
 		<Card style={styles.welcomeCard}><View style={[styles.welcomeMark, { backgroundColor: colors.accentSoft }]}><ClipboardCheck color={colors.text} size={25} /></View><View style={styles.cardCopy}><Text style={[styles.cardTitle, { color: colors.text }]}>Быстрый доступ</Text><Text style={[styles.cardBody, { color: colors.muted }]}>Переходите к тестам или подготовьте фото для рабочего отчёта.</Text></View></Card>
 		<View style={styles.actions}><ActionButton label="Открыть тесты" icon={ClipboardCheck} onPress={() => router.push('/(tabs)/quizzes')} /><ActionButton label="Добавить фото" icon={Camera} variant="secondary" onPress={() => router.push('/(tabs)/photos')} /></View>
 		<SectionTitle>Следующий шаг</SectionTitle>
-		<Pressable onPress={() => router.push('/activation')} style={({ pressed }) => [styles.activationCard, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.75 : 1 }]}><View style={styles.activationCopy}><Text style={[styles.cardTitle, { color: colors.text }]}>Активировать приложение</Text><Text style={[styles.cardBody, { color: colors.muted }]}>Демонстрационный экран сканирования QR-кода для первого входа.</Text></View><ArrowRight color={colors.muted} size={20} /></Pressable>
+		<Pressable style={({ pressed }) => [styles.activationCard, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.75 : 1 }]}><View style={styles.activationCopy}><Text style={[styles.cardTitle, { color: colors.text }]}>Сессия защищена</Text><Text style={[styles.cardBody, { color: colors.muted }]}>Доступ к рабочим данным открыт только для вашей активной учётной записи.</Text></View><ArrowRight color={colors.muted} size={20} /></Pressable>
 	</Screen>
 }
 

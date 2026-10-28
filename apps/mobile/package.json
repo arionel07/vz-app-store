@@ -9,6 +9,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
     "validate": "expo config --type public",
     "export": "expo export --platform all"
@@ -16,9 +17,12 @@
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
     "expo": "~54.0.38",
+    "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.14",
+    "expo-crypto": "~15.0.9",
     "expo-linking": "~8.0.12",
     "expo-router": "~6.0.24",
+    "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.9",
     "lucide-react-native": "^0.468.0",
     "react": "19.1.0",

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router'
 import { ChevronLeft, type LucideIcon } from 'lucide-react-native'
 import { useMemo, type PropsWithChildren, type ReactNode } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppTheme } from '../theme'
 
@@ -19,11 +19,6 @@ export function ScreenHeader({ title, subtitle, back = false, action }: { title:
 	const { colors } = useAppTheme()
 	return <View style={styles.header}>
 		<View style={styles.headerTitleRow}>{back && <Pressable accessibilityLabel="Назад" hitSlop={10} onPress={() => router.back()} style={styles.backButton}><ChevronLeft size={24} color={colors.text} /></Pressable>}<View style={styles.headerCopy}><Text style={[styles.eyebrow, { color: colors.muted }]}>VIZAJE STAFF</Text><Text style={[styles.heading, { color: colors.text }]}>{title}</Text>{subtitle && <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text>}</View></View>{action}</View>
-}
-
-export function DemoBadge() {
-	const { colors } = useAppTheme()
-	return <View style={[styles.badge, { backgroundColor: colors.accentSoft }]}><View style={[styles.badgeDot, { backgroundColor: colors.warning }]} /><Text style={[styles.badgeText, { color: colors.muted }]}>Демонстрационный режим · API не подключён</Text></View>
 }
 
 export function SectionTitle({ children, right }: PropsWithChildren<{ right?: ReactNode }>) {
@@ -58,6 +53,16 @@ export function DemoState({ title, body, loading = false }: { title: string; bod
 	return <View style={[styles.demoState, { backgroundColor: colors.surfaceRaised }]}><View style={[styles.demoStateMark, { backgroundColor: loading ? colors.accent : colors.border }]} /><View style={styles.demoStateCopy}><Text style={[styles.demoStateTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.demoStateBody, { color: colors.muted }]}>{body}</Text></View></View>
 }
 
+export function SessionStatusScreen({ title, body, actionLabel, onAction, loading = false }: { title: string; body: string; actionLabel?: string; onAction?: () => void; loading?: boolean }) {
+	const { colors } = useAppTheme()
+	return <View style={[styles.sessionStatus, { backgroundColor: colors.background }]}>
+		{loading ? <ActivityIndicator color={colors.text} size="small" /> : <View style={[styles.sessionStatusMark, { backgroundColor: colors.accentSoft }]} />}
+		<Text style={[styles.sessionStatusTitle, { color: colors.text }]}>{title}</Text>
+		<Text style={[styles.sessionStatusBody, { color: colors.muted }]}>{body}</Text>
+		{actionLabel && onAction && <ActionButton label={actionLabel} variant="secondary" onPress={onAction} style={styles.sessionStatusAction} />}
+	</View>
+}
+
 const styles = StyleSheet.create({
 	screen: { flex: 1 },
 	screenContent: { paddingHorizontal: 20, paddingTop: 18, gap: 24 },
@@ -68,9 +73,6 @@ const styles = StyleSheet.create({
 	eyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
 	heading: { marginTop: 5, fontSize: 28, fontWeight: '700', letterSpacing: -0.7 },
 	subtitle: { marginTop: 6, fontSize: 15, lineHeight: 21 },
-	badge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 8, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
-	badgeDot: { width: 7, height: 7, borderRadius: 7 },
-	badgeText: { fontSize: 11, fontWeight: '600' },
 	sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
 	sectionHeading: { fontSize: 18, fontWeight: '700', letterSpacing: -0.2 },
 	card: { borderWidth: 1, borderRadius: 18, padding: 18 },
@@ -85,4 +87,9 @@ const styles = StyleSheet.create({
 	demoStateCopy: { flex: 1, gap: 3 },
 	demoStateTitle: { fontSize: 14, fontWeight: '700' },
 	demoStateBody: { fontSize: 13, lineHeight: 18 },
+	sessionStatus: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 14 },
+	sessionStatusMark: { width: 40, height: 40, borderRadius: 14 },
+	sessionStatusTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center' },
+	sessionStatusBody: { maxWidth: 330, fontSize: 15, lineHeight: 22, textAlign: 'center' },
+	sessionStatusAction: { width: '100%', marginTop: 4 },
 })

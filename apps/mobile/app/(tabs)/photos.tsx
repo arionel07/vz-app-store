@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router'
 import { Camera, Image as ImageIcon, Inbox } from 'lucide-react-native'
 import { Alert, StyleSheet, Text, View } from 'react-native'
-import { ActionButton, DemoBadge, EmptyState, Screen, ScreenHeader, SectionTitle } from '../../src/components/ui'
+import { ActionButton, EmptyState, Screen, ScreenHeader, SectionTitle } from '../../src/components/ui'
 import { useAppTheme } from '../../src/theme'
 
 export default function PhotosScreen() {
@@ -10,7 +10,6 @@ export default function PhotosScreen() {
 	const placeholder = (title: string) => Alert.alert(title, 'Камера и галерея будут подключены в следующем milestone.')
 	return <Screen>
 		<ScreenHeader title="Фото" subtitle="Сохраняйте рабочие моменты магазина." />
-		<DemoBadge />
 		<View style={styles.actionGrid}><View style={styles.actionItem}><ActionButton label="Открыть камеру" icon={Camera} onPress={() => placeholder('Камера')} /><Text style={[styles.actionHint, { color: colors.muted }]}>Доступ к камере появится позже.</Text></View><View style={styles.actionItem}><ActionButton label="Выбрать фото" icon={ImageIcon} variant="secondary" onPress={() => placeholder('Галерея')} /><Text style={[styles.actionHint, { color: colors.muted }]}>Выбор из галереи появится позже.</Text></View></View>
 		<View style={styles.historyHeader}><SectionTitle>История загрузок</SectionTitle><Text style={[styles.demoLabel, { color: colors.muted }]}>ДЕМО</Text></View>
 		<EmptyState icon={Inbox} title="История пока пуста" body="Здесь появятся ваши фотографии после подключения загрузки и профиля сотрудника." />
