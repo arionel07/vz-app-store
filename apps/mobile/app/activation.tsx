@@ -5,7 +5,7 @@ import { Camera, QrCode, ShieldCheck } from 'lucide-react-native'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { ApiError, isNetworkError } from '../src/api/client'
-import { parseActivationPayload } from '../src/auth/activation-payload'
+import { createActivationLinkGate, parseActivationPayload, type ActivationPayload } from '../src/auth/activation-payload'
 import { useAuth } from '../src/auth/auth-context'
 import { ActionButton, Card, Screen, ScreenHeader } from '../src/components/ui'
 import { useAppTheme } from '../src/theme'
@@ -27,22 +27,21 @@ export default function ActivationScreen() {
 	const [scanning, setScanning] = useState(false)
 	const [busy, setBusy] = useState(false)
 	const [message, setMessage] = useState<string | null>(null)
+	const [pendingLink, setPendingLink] = useState<ActivationPayload | null>(null)
 	const scanLocked = useRef(false)
-	const deepLinkHandled = useRef(false)
+	const busyRef = useRef(false)
+	const lastUrl = useRef<string | null>(null)
+	const linkGate = useRef(createActivationLinkGate())
 	const url = useURL()
+	const activationLinkBaseUrl = process.env.EXPO_PUBLIC_ACTIVATION_LINK_BASE_URL
 
-	const redeemPayload = useCallback(async (rawValue: string) => {
-		if (scanLocked.current || busy) return
+	const redeemPayload = useCallback(async (payload: ActivationPayload) => {
+		if (scanLocked.current || busyRef.current) return
 		scanLocked.current = true
+		busyRef.current = true
 		setScanning(false)
-		const payload = parseActivationPayload(rawValue)
-		if (!payload) {
-			setMessage('QR-код не является кодом активации Vizaje.')
-			scanLocked.current = false
-			return
-		}
-		setBusy(true)
 		setMessage(null)
+		setBusy(true)
 		try {
 			await redeemActivation(payload.secret)
 			router.replace('/(tabs)')
@@ -50,15 +49,35 @@ export default function ActivationScreen() {
 			setMessage(activationError(error))
 			scanLocked.current = false
 		} finally {
+			busyRef.current = false
 			setBusy(false)
 		}
-	}, [busy, redeemActivation, router])
+	}, [redeemActivation, router])
 
 	useEffect(() => {
-		if (!url || deepLinkHandled.current) return
-		deepLinkHandled.current = true
-		void redeemPayload(url)
-	}, [redeemPayload, url])
+		if (!url || url === lastUrl.current) return
+		lastUrl.current = url
+		const payload = parseActivationPayload(url, activationLinkBaseUrl)
+		if (!payload) {
+			setMessage('Ссылка активации недействительна или больше не поддерживается.')
+			return
+		}
+		if (!linkGate.current(payload)) return
+		setMessage(null)
+		setPendingLink(payload)
+	}, [activationLinkBaseUrl, url])
+
+	const confirmLinkActivation = () => {
+		if (!pendingLink || busyRef.current) return
+		const payload = pendingLink
+		setPendingLink(null)
+		void redeemPayload(payload)
+	}
+
+	const cancelLinkActivation = () => {
+		setPendingLink(null)
+		setMessage('Активация отменена.')
+	}
 
 	const startScanning = async () => {
 		setMessage(null)
@@ -76,17 +95,24 @@ export default function ActivationScreen() {
 	}
 
 	const onBarcodeScanned = (result: BarcodeScanningResult) => {
-		void redeemPayload(result.data)
+		const payload = parseActivationPayload(result.data)
+		if (!payload || payload.source !== 'custom') {
+			setMessage('QR-код не является кодом активации Vizaje.')
+			scanLocked.current = false
+			return
+		}
+		void redeemPayload(payload)
 	}
 
 	return <Screen>
 		<ScreenHeader title="Активация" subtitle="Подключите мобильное приложение к профилю." back />
 		<View style={styles.hero}><View style={[styles.qrMark, { backgroundColor: colors.accentSoft }]}><QrCode color={colors.text} size={42} strokeWidth={1.7} /></View><Text style={[styles.heroTitle, { color: colors.text }]}>Сканирование QR-кода</Text><Text style={[styles.heroBody, { color: colors.muted }]}>Попросите менеджера создать одноразовый код активации и наведите камеру на QR-код.</Text></View>
-		{scanning && <View style={styles.cameraShell}><CameraView style={styles.camera} facing="back" barcodeScannerSettings={{ barcodeTypes: ['qr'] }} onBarcodeScanned={scanLocked.current ? undefined : onBarcodeScanned}><View style={styles.scanOverlay}><View style={[styles.scanFrame, { borderColor: colors.onAccent }]} /><Text style={styles.scanHint}>Наведите камеру на QR-код</Text></View></CameraView><ActionButton label="Закрыть камеру" variant="secondary" onPress={() => setScanning(false)} /></View>}
+		{pendingLink && <Card style={styles.linkConfirmation}><Text style={[styles.confirmationTitle, { color: colors.text }]}>Подтвердите активацию</Text><Text style={[styles.confirmationBody, { color: colors.muted }]}>Ссылка активирует рабочий аккаунт на этом устройстве. Она одноразовая и действует ограниченное время.</Text><ActionButton label="Активировать приложение" onPress={confirmLinkActivation} /><ActionButton label="Отмена" variant="secondary" onPress={cancelLinkActivation} /></Card>}
+		{!pendingLink && scanning && <View style={styles.cameraShell}><CameraView style={styles.camera} facing="back" barcodeScannerSettings={{ barcodeTypes: ['qr'] }} onBarcodeScanned={scanLocked.current ? undefined : onBarcodeScanned}><View style={styles.scanOverlay}><View style={[styles.scanFrame, { borderColor: colors.onAccent }]} /><Text style={styles.scanHint}>Наведите камеру на QR-код</Text></View></CameraView><ActionButton label="Закрыть камеру" variant="secondary" onPress={() => setScanning(false)} /></View>}
 		<Card><View style={styles.infoRow}><ShieldCheck color={colors.success} size={21} /><Text style={[styles.infoText, { color: colors.text }]}>Код используется один раз и не сохраняется в приложении.</Text></View></Card>
 		{message && <View accessibilityRole="alert" style={[styles.message, { backgroundColor: colors.accentSoft }]}><Text style={[styles.messageText, { color: colors.text }]}>{message}</Text>{message.includes('настройках') && <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()}><Text style={[styles.settingsLink, { color: colors.text }]}>Открыть настройки</Text></Pressable>}</View>}
-		{busy ? <View style={styles.busy}><ActivityIndicator color={colors.text} /><Text style={[styles.busyText, { color: colors.muted }]}>Проверяем код активации…</Text></View> : !scanning && <ActionButton label="Сканировать QR-код" icon={Camera} onPress={() => void startScanning()} />}
-		{!scanning && <ActionButton label="Вернуться на главную" variant="quiet" onPress={() => router.replace('/(tabs)')} />}
+		{busy ? <View style={styles.busy}><ActivityIndicator color={colors.text} /><Text style={[styles.busyText, { color: colors.muted }]}>Проверяем код активации…</Text></View> : !scanning && !pendingLink && <ActionButton label="Сканировать QR-код" icon={Camera} onPress={() => void startScanning()} />}
+		{!scanning && !pendingLink && <ActionButton label="Вернуться на главную" variant="quiet" onPress={() => router.replace('/(tabs)')} />}
 	</Screen>
 }
 
@@ -107,4 +133,7 @@ const styles = StyleSheet.create({
 	settingsLink: { fontSize: 14, fontWeight: '700' },
 	busy: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
 	busyText: { fontSize: 15 },
+	linkConfirmation: { gap: 14 },
+	confirmationTitle: { fontSize: 18, fontWeight: '800' },
+	confirmationBody: { fontSize: 15, lineHeight: 22 },
 })

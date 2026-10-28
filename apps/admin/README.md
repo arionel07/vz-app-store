@@ -13,6 +13,12 @@ VIZAJE_API_URL=http://127.0.0.1:3000 bun run --cwd apps/admin dev -- --port 3001
 
 Open `http://localhost:3001`. The visual component catalogue is available at `/design-system` in development only and is excluded from production through a server-side `notFound()` guard.
 
+Set `NEXT_PUBLIC_ACTIVATION_LINK_BASE_URL` to the configured public HTTPS
+activation page, for example `https://staff.example.com/activate`, to enable
+the **Скопировать ссылку** action in the activation dialog. The value is a
+public URL, not a secret, and must match the mobile
+`EXPO_PUBLIC_ACTIVATION_LINK_BASE_URL` setting.
+
 ## Checks
 
 ```bash

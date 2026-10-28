@@ -13,6 +13,12 @@ Simulator, `http://10.0.2.2:3000` for the Android Emulator, or a reachable
 HTTPS staging origin for a physical device. A phone cannot use the host's
 localhost address.
 
+`EXPO_PUBLIC_ACTIVATION_LINK_BASE_URL` is optional and must match the Admin
+`NEXT_PUBLIC_ACTIVATION_LINK_BASE_URL` value, such as
+`https://staff.example.com/activate`. HTTPS links require domain association
+and native device verification; `vizaje://activate` remains the development
+fallback until that configuration is complete.
+
 The app uses the system appearance by default and includes a manual theme
 selector on the Profile screen. QR camera permission is requested only after
 the employee taps the scan action. Published quizzes and attempts use

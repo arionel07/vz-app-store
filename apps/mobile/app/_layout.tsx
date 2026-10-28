@@ -16,7 +16,7 @@ function AuthGate({ children }: { children: ReactNode }) {
 	const navigation = useRouter()
 	const { status, retryRestore } = useAuth()
 	const protectedRoute = segments[0] === '(tabs)' || segments[0] === 'profile'
-	const activationRoute = segments[0] === 'activation'
+	const activationRoute = segments[0] === 'activation' || segments[0] === 'activate'
 
 	useEffect(() => {
 		if (status === 'unauthenticated' && protectedRoute) navigation.replace('/activation')
@@ -39,6 +39,7 @@ export default function RootLayout() {
 			<Stack.Screen name="(tabs)" />
 			<Stack.Screen name="profile" />
 			<Stack.Screen name="activation" />
+			<Stack.Screen name="activate" />
 			<Stack.Screen name="quiz/[id]" />
 			<Stack.Screen name="quiz/[id]/attempt" />
 			<Stack.Screen name="attempt/[attemptId]" />

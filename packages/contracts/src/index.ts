@@ -1,5 +1,6 @@
 export * from "./health";
 export * from "./auth";
+export * from "./activation";
 export * from "./quizzes";
 export * from "./photos";
 export * from "./stores";

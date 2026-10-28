@@ -1,4 +1,4 @@
-# Vizaje Staff — Native QA 11.1
+# Vizaje Staff — Native QA 11.2
 
 Этот документ предназначен для ручной проверки native development/preview build. В этой среде физическое устройство и iOS/Android simulator не запускались, поэтому поля `Результат` нужно заполнить на реальном QA-прогоне.
 
@@ -9,6 +9,7 @@
    - iOS Simulator: `http://127.0.0.1:3000`;
    - Android Emulator: `http://10.0.2.2:3000`;
    - физическое устройство: доступный по сети HTTPS staging endpoint.
+   Для проверки HTTPS activation link задайте также `EXPO_PUBLIC_ACTIVATION_LINK_BASE_URL` и используйте то же значение, что и в Admin.
 3. Убедитесь, что API доступен с устройства, а firewall допускает только нужный тестовый порт.
 4. Для локального native development build на macOS:
 
@@ -54,7 +55,7 @@
 | 2 | Light/Dark/System appearance | Тема следует системной настройке; текст и контролы остаются читаемыми | |
 | 3 | Отказ в camera permission | QR-сканер не запускается, показана понятная ошибка и ссылка на настройки | |
 | 4 | Разрешение camera permission | Камера запускается только после нажатия; QR-сканер видит QR-код | |
-| 5 | Deep link `vizaje://activate` | Ссылка открывает приложение и обрабатывается как activation payload | |
+| 5 | Deep link `vizaje://activate` | Ссылка открывает приложение, показывает подтверждение и обрабатывается как activation payload | |
 | 6 | Одноразовая активация | Валидный QR активирует сотрудника; повторное использование отклоняется | |
 | 7 | Неверный/просроченный QR | Показана generic ошибка, secret не сохраняется и не логируется | |
 | 8 | Persistence после restart | После закрытия и повторного запуска валидная mobile session восстанавливается через SecureStore | |
@@ -72,11 +73,16 @@
 | 20 | Cancel upload | Отмена оставляет текущий элемент в failed; повтор запускается только вручную | |
 | 21 | Private photo viewing | История загружается с bearer; image URL не содержит token; без сессии фото недоступно | |
 | 22 | Logout | Локальная сессия очищается, API revoke вызывается, защищенные экраны больше не открываются | |
+| 23 | HTTPS activation link | При настроенной domain association ссылка открывает приложение; token не показывается на экране | |
+| 24 | Link confirmation/duplicate events | До подтверждения redemption не выполняется; повторное событие не создаёт второй запрос | |
+| 25 | Browser fallback | Без приложения открывается минимальная страница установки; браузер не redeem-ит token | |
+| 26 | QR/link same secret | QR и link используют один token: после redemption одним способом второй получает invalid/expired | |
 
 ## Native compatibility notes
 
 - QR uses `expo-camera` and requires a native development build; Expo Go is not a substitute for this verification.
 - `expo-secure-store` is configured with Android backup rules and no Face ID prompt is requested by this app.
-- `expo-image-picker`, `expo-image-manipulator`, `expo-image` and `expo-file-system` are pinned to Expo SDK 54-compatible versions in the workspace lockfile.
+- `expo-camera`, `expo-image-picker`, `expo-image-manipulator`, `expo-image`, `expo-file-system` and `expo-secure-store` are pinned to Expo SDK 58-compatible versions in the workspace lockfile.
 - Authenticated photo previews are downloaded to the app cache with an `Authorization` header; session tokens are not placed in image URLs or logs.
 - `EXPO_PUBLIC_API_URL` is mandatory at runtime. HTTP is accepted only for explicitly local simulator/emulator hosts; non-local endpoints must use HTTPS.
+- HTTPS activation links are parser-ready but are not claimed as working until Apple/Android domain association and native device verification are complete. `vizaje://activate` remains the development fallback.
