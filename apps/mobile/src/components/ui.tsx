@@ -1,9 +1,10 @@
-import { useRouter } from 'expo-router'
+import { useRouter, type Href } from 'expo-router'
 import { ChevronLeft, type LucideIcon } from 'lucide-react-native'
 import { useMemo, type PropsWithChildren, type ReactNode } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppTheme } from '../theme'
+import { goBackOrReplace } from '../navigation/safe-navigation'
 
 type ScreenProps = PropsWithChildren<{ scroll?: boolean; contentStyle?: StyleProp<ViewStyle>; refreshing?: boolean; onRefresh?: () => void }>
 
@@ -15,11 +16,13 @@ export function Screen({ children, scroll = true, contentStyle, refreshing, onRe
 	return scroll ? <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={screenContentStyle} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>{children}</ScrollView> : <View style={[styles.screen, { backgroundColor: colors.background }]}><View style={screenContentStyle}>{children}</View></View>
 }
 
-export function ScreenHeader({ title, subtitle, back = false, action }: { title: string; subtitle?: string; back?: boolean; action?: ReactNode }) {
+export function ScreenHeader({ title, subtitle, back = false, backFallback, action }: { title: string; subtitle?: string; back?: boolean; backFallback?: Href; action?: ReactNode }) {
 	const router = useRouter()
 	const { colors } = useAppTheme()
+	const canGoBack = router.canGoBack()
+	const fallback = backFallback ?? '/(tabs)'
 	return <View style={styles.header}>
-		<View style={styles.headerTitleRow}>{back && <Pressable accessibilityLabel="Назад" hitSlop={10} onPress={() => router.back()} style={styles.backButton}><ChevronLeft size={24} color={colors.text} /></Pressable>}<View style={styles.headerCopy}><Text style={[styles.eyebrow, { color: colors.muted }]}>VIZAJE STAFF</Text><Text style={[styles.heading, { color: colors.text }]}>{title}</Text>{subtitle && <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text>}</View></View>{action}</View>
+		<View style={styles.headerTitleRow}>{back && <Pressable accessibilityLabel="Назад" hitSlop={10} disabled={!canGoBack && !backFallback} onPress={() => goBackOrReplace(router, fallback)} style={[styles.backButton, !canGoBack && !backFallback && styles.backButtonDisabled]}><ChevronLeft size={24} color={colors.text} /></Pressable>}<View style={styles.headerCopy}><Text style={[styles.eyebrow, { color: colors.muted }]}>VIZAJE STAFF</Text><Text style={[styles.heading, { color: colors.text }]}>{title}</Text>{subtitle && <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text>}</View></View>{action}</View>
 }
 
 export function SectionTitle({ children, right }: PropsWithChildren<{ right?: ReactNode }>) {
@@ -81,6 +84,7 @@ const styles = StyleSheet.create({
 	headerTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
 	headerCopy: { flex: 1 },
 	backButton: { marginTop: 17, padding: 2 },
+	backButtonDisabled: { opacity: 0.35 },
 	eyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
 	heading: { marginTop: 5, fontSize: 28, fontWeight: '700', letterSpacing: -0.7 },
 	subtitle: { marginTop: 6, fontSize: 15, lineHeight: 21 },

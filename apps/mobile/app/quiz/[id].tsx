@@ -67,7 +67,7 @@ export default function QuizIntroductionScreen() {
 	}
 
 	return <Screen>
-		<ScreenHeader title="О тесте" subtitle="Внимательно прочитайте условия перед началом." back />
+		<ScreenHeader title="О тесте" subtitle="Внимательно прочитайте условия перед началом." back backFallback="/(tabs)/quizzes" />
 		{loading ? <View style={styles.loading}><ActivityIndicator color={colors.text} /><Text style={[styles.muted, { color: colors.muted }]}>Загружаем тест…</Text></View> : error && !quiz ? <InlineMessage title="Тест недоступен" body={error} actionLabel="Повторить" onAction={() => void load()} /> : quiz && <>
 			<Card><View style={[styles.icon, { backgroundColor: colors.accentSoft }]}><BookOpen color={colors.text} size={24} /></View><Text style={[styles.title, { color: colors.text }]}>{quiz.title}</Text>{quiz.description && <Text style={[styles.description, { color: colors.muted }]}>{quiz.description}</Text>}<View style={styles.meta}><View><Text style={[styles.metaLabel, { color: colors.muted }]}>Вопросы</Text><Text style={[styles.metaValue, { color: colors.text }]}>{questionLabel(quiz.questions.length)}</Text></View><View><Text style={[styles.metaLabel, { color: colors.muted }]}>Проходной балл</Text><Text style={[styles.metaValue, { color: colors.text }]}>{quiz.passingScore}%</Text></View><View><Text style={[styles.metaLabel, { color: colors.muted }]}>Ревизия</Text><Text style={[styles.metaValue, { color: colors.text }]}>{quiz.revisionNumber}</Text></View></View></Card>
 			{error && <View style={[styles.warning, { backgroundColor: colors.surfaceRaised }]}><CircleAlert color={colors.warning} size={19} /><Text style={[styles.warningText, { color: colors.text }]}>{error}</Text></View>}

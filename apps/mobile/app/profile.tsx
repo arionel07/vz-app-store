@@ -13,7 +13,7 @@ export default function ProfileScreen() {
 	const { user, logout } = useAuth()
 	const [logoutBusy, setLogoutBusy] = useState(false)
 
-	if (!user) return <Screen><ScreenHeader title="Профиль" subtitle="Проверяем данные аккаунта." back /></Screen>
+	if (!user) return <Screen><ScreenHeader title="Профиль" subtitle="Проверяем данные аккаунта." back backFallback="/(tabs)" /></Screen>
 
 	const initials = `${user.firstName[0] ?? ''}${user.lastName[0] ?? ''}`.toUpperCase()
 	const confirmLogout = () => Alert.alert('Выйти из аккаунта?', 'Сессия на этом устройстве будет удалена.', [
@@ -30,7 +30,7 @@ export default function ProfileScreen() {
 	}
 
 	return <Screen>
-		<ScreenHeader title="Профиль" subtitle="Данные текущего сотрудника." back />
+		<ScreenHeader title="Профиль" subtitle="Данные текущего сотрудника." back backFallback="/(tabs)" />
 		<View style={styles.identity}><View style={[styles.avatar, { backgroundColor: colors.accent }]}><Text style={[styles.avatarText, { color: colors.onAccent }]}>{initials}</Text></View><View style={styles.identityCopy}><Text style={[styles.name, { color: colors.text }]}>{user.firstName} {user.lastName}</Text><Text style={[styles.muted, { color: colors.muted }]}>{user.email ?? 'Email не указан'}</Text></View></View>
 		<View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={styles.infoRow}><UserRound color={colors.muted} size={19} /><View><Text style={[styles.infoLabel, { color: colors.muted }]}>Роль</Text><Text style={[styles.infoValue, { color: colors.text }]}>{roleLabels[user.role]}</Text></View></View><View style={[styles.divider, { backgroundColor: colors.border }]} /><View style={styles.infoRow}><Smartphone color={colors.muted} size={19} /><View style={styles.storeCopy}><Text style={[styles.infoLabel, { color: colors.muted }]}>Активные магазины</Text>{user.assignedStores.length === 0 ? <Text style={[styles.infoValue, { color: colors.text }]}>Нет активных назначений</Text> : user.assignedStores.map((store) => <Text key={store.id} style={[styles.infoValue, { color: colors.text }]}>{store.name} · {store.code}</Text>)}</View></View><View style={[styles.divider, { backgroundColor: colors.border }]} /><View style={styles.infoRow}><Text style={[styles.statusDot, { color: user.isActive ? colors.success : colors.danger }]}>●</Text><View><Text style={[styles.infoLabel, { color: colors.muted }]}>Статус аккаунта</Text><Text style={[styles.infoValue, { color: colors.text }]}>{user.isActive ? 'Активен' : 'Неактивен'}</Text></View></View></View>
 		<SectionTitle>Внешний вид</SectionTitle>

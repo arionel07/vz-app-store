@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { AuthProvider, useAuth } from '../src/auth/auth-context'
 import { SessionStatusScreen } from '../src/components/ui'
+import { authRedirect } from '../src/navigation/safe-navigation'
 import { AppThemeProvider, useAppTheme } from '../src/theme'
 
 function ThemedStatusBar() {
@@ -17,11 +18,11 @@ function AuthGate({ children }: { children: ReactNode }) {
 	const { status, retryRestore } = useAuth()
 	const protectedRoute = segments[0] === '(tabs)' || segments[0] === 'profile'
 	const activationRoute = segments[0] === 'activation' || segments[0] === 'activate'
+	const redirect = authRedirect(status, segments[0])
 
 	useEffect(() => {
-		if (status === 'unauthenticated' && protectedRoute) navigation.replace('/activation')
-		if (status === 'authenticated' && activationRoute) navigation.replace('/(tabs)')
-	}, [activationRoute, navigation, protectedRoute, status])
+		if (redirect) navigation.replace(redirect)
+	}, [navigation, redirect])
 
 	if (status === 'loading') return <SessionStatusScreen title="Проверяем доступ" body="Подготавливаем защищённую сессию." loading />
 	if (status === 'offline') return <SessionStatusScreen title="Нет соединения" body="Сохранённая сессия не потеряна. Подключитесь к сети и повторите проверку." actionLabel="Повторить" onAction={() => void retryRestore()} />

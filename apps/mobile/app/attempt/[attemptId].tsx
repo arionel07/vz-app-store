@@ -57,8 +57,8 @@ export default function AttemptResultScreen() {
 		}
 	}
 
-	if (loading) return <Screen><ScreenHeader title="Результат" subtitle="Загружаем попытку." back /><View style={styles.loading}><ActivityIndicator color={colors.text} /></View></Screen>
-	if (error && !attempt) return <Screen><ScreenHeader title="Результат" subtitle="Попытка недоступна." back /><InlineMessage title="Не удалось открыть результат" body={error} actionLabel="Повторить" onAction={() => void load()} /></Screen>
+	if (loading) return <Screen><ScreenHeader title="Результат" subtitle="Загружаем попытку." back backFallback="/(tabs)/quizzes" /><View style={styles.loading}><ActivityIndicator color={colors.text} /></View></Screen>
+	if (error && !attempt) return <Screen><ScreenHeader title="Результат" subtitle="Попытка недоступна." back backFallback="/(tabs)/quizzes" /><InlineMessage title="Не удалось открыть результат" body={error} actionLabel="Повторить" onAction={() => void load()} /></Screen>
 	if (!attempt) return null
 
 	const quiz = attempt.quiz
@@ -66,7 +66,7 @@ export default function AttemptResultScreen() {
 	const passed = attempt.passed === true
 
 	return <Screen>
-		<ScreenHeader title={isSubmitted ? 'Результат' : 'Незавершённый тест'} subtitle={quiz?.title ?? 'Тест'} back />
+		<ScreenHeader title={isSubmitted ? 'Результат' : 'Незавершённый тест'} subtitle={quiz?.title ?? 'Тест'} back backFallback="/(tabs)/quizzes" />
 		{isSubmitted ? <Card style={styles.resultCard}><View style={[styles.resultIcon, { backgroundColor: passed ? colors.accentSoft : colors.surfaceRaised }]}>{passed ? <CheckCircle2 color={colors.success} size={34} /> : <XCircle color={colors.danger} size={34} />}</View><Text style={[styles.resultTitle, { color: colors.text }]}>{passed ? 'Тест пройден' : 'Тест не пройден'}</Text><Text style={[styles.score, { color: passed ? colors.success : colors.danger }]}>{attempt.scorePercent ?? 0}%</Text><Text style={[styles.resultBody, { color: colors.muted }]}>{quiz ? `Проходной балл: ${quiz.passingScore}%` : 'Порог прохождения недоступен.'}</Text><View style={styles.details}><Text style={[styles.detail, { color: colors.muted }]}>Ревизия {attempt.revisionNumber}</Text><Text style={[styles.detail, { color: colors.muted }]}>{dateText(attempt.submittedAt ?? attempt.startedAt)}</Text></View></Card> : <InlineMessage title="Попытка не завершена" body="Вы можете продолжить отвечать на вопросы с сохранённого места." actionLabel="Продолжить" onAction={() => router.replace({ pathname: '/quiz/[id]/attempt', params: { id: attempt.quizId, attemptId: attempt.id } })} />}
 		{error && <InlineMessage title="Не удалось начать новую попытку" body={error} actionLabel="Повторить" onAction={() => void retry()} />}
 		{isSubmitted && <ActionButton label={retrying ? 'Готовим новую попытку…' : 'Пройти ещё раз'} icon={RotateCcw} disabled={retrying} variant="secondary" onPress={() => void retry()} />}
