@@ -2,9 +2,12 @@
 
 Expo Router application for the Vizaje Staff iOS/Android application.
 
-The app uses the existing Hono API for QR activation and mobile bearer
-sessions. Access tokens are stored only in `expo-secure-store`; no session
-data is kept in AsyncStorage or exposed to screen components.
+The app uses the existing Hono API for QR activation, staff email/password
+login and mobile bearer sessions. Access tokens are stored only in
+`expo-secure-store`; no session data is kept in AsyncStorage or exposed to
+screen components. Password login is limited server-side to active staff
+accounts with a provisioned email and password; managers and administrators
+continue to use the Admin web login.
 
 Run from the repository root with `bun run --cwd apps/mobile start`.
 

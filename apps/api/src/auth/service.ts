@@ -1,8 +1,11 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import {
   adminLoginRequestSchema,
+  mobileLoginRequestSchema,
+  setUserPasswordRequestSchema,
   type AdminLoginRequest,
   type BrowserLoginResponse,
+  type MobileLoginRequest,
   type MobileSessionResponse,
   type SessionResponse,
 } from "@vizaje/contracts";
@@ -11,6 +14,8 @@ import type { Database } from "../db/client";
 import { activationTokens, stores, userStores, users } from "../db/schema";
 import {
   assertActivePrincipal,
+  assertCanManageTargetUser,
+  assertCanManageUsers,
   assertCanReadUser,
   type TrustedPrincipal,
 } from "../domain/authz";
@@ -18,13 +23,14 @@ import { DomainError } from "../domain/errors";
 import { normalizeEmail } from "../domain/normalize";
 import { createUsersService, type UsersService } from "../domain/users/service";
 import { hashToken, randomToken } from "./crypto";
-import { defaultActivationRateLimiter, defaultLoginRateLimiter, InMemoryRateLimiter } from "./rate-limit";
+import { defaultActivationRateLimiter, defaultLoginRateLimiter, defaultMobileLoginRateLimiter, InMemoryRateLimiter } from "./rate-limit";
 import { SessionService, type AuthenticatedSession, type SessionServiceOptions } from "./session-service";
 
 const ACTIVATION_TTL_MS = 5 * 60 * 1000;
 
 export interface AuthServiceOptions extends SessionServiceOptions {
   loginRateLimiter?: InMemoryRateLimiter;
+  mobileLoginRateLimiter?: InMemoryRateLimiter;
   activationRateLimiter?: InMemoryRateLimiter;
 }
 
@@ -36,6 +42,7 @@ export class AuthService {
   readonly sessions: SessionService;
   private readonly users: UsersService;
   private readonly loginRateLimiter: InMemoryRateLimiter;
+  private readonly mobileLoginRateLimiter: InMemoryRateLimiter;
   private readonly activationRateLimiter: InMemoryRateLimiter;
   private readonly dummyPasswordHash: Promise<string>;
 
@@ -43,6 +50,7 @@ export class AuthService {
     this.sessions = new SessionService(db, options);
     this.users = createUsersService(db);
     this.loginRateLimiter = options.loginRateLimiter ?? defaultLoginRateLimiter;
+    this.mobileLoginRateLimiter = options.mobileLoginRateLimiter ?? defaultMobileLoginRateLimiter;
     this.activationRateLimiter = options.activationRateLimiter ?? defaultActivationRateLimiter;
     this.dummyPasswordHash = Bun.password.hash(randomToken(), { algorithm: "argon2id" });
   }
@@ -70,6 +78,54 @@ export class AuthService {
     const session = await this.sessions.create(user.id, "browser", { userAgent: metadata.userAgent });
     const responseUser = await this.users.getUserById(session.principal, user.id);
     return { session, user: responseUser };
+  }
+
+  async mobileLogin(input: MobileLoginRequest, metadata: LoginMetadata = {}): Promise<MobileSessionResponse> {
+    const data = mobileLoginRequestSchema.parse(input);
+    const email = normalizeEmail(data.email)!;
+    const rateKey = `mobile:${email}`;
+    if (!this.mobileLoginRateLimiter.isAllowed(rateKey)) {
+      throw new DomainError(401, "INVALID_CREDENTIALS", "Invalid email or password");
+    }
+
+    const [user] = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
+    const passwordHash = user?.passwordHash ?? (await this.dummyPasswordHash);
+    const passwordMatches = await Bun.password.verify(data.password, passwordHash);
+    const eligible = Boolean(user && user.isActive && user.role === "staff" && user.passwordHash && passwordMatches);
+
+    if (!eligible) {
+      this.mobileLoginRateLimiter.recordFailure(rateKey);
+      throw new DomainError(401, "INVALID_CREDENTIALS", "Invalid email or password");
+    }
+
+    this.mobileLoginRateLimiter.recordSuccess(rateKey);
+    const session = await this.sessions.create(user.id, "mobile", {
+      deviceId: data.deviceId,
+      userAgent: metadata.userAgent,
+    });
+    return {
+      accessToken: session.token,
+      expiresAt: session.expiresAt.toISOString(),
+      maxExpiresAt: session.maxExpiresAt.toISOString(),
+      user: await this.users.getUserById(session.principal, user.id),
+    };
+  }
+
+  async setStaffPassword(principal: TrustedPrincipal, userId: string, password: string): Promise<void> {
+    assertCanManageUsers(principal);
+    const data = setUserPasswordRequestSchema.parse({ password });
+    const user = await this.users.getUserById(principal, userId);
+    assertCanManageTargetUser(principal, user);
+    if (user.role !== "staff") {
+      throw new DomainError(403, "STAFF_PASSWORD_ONLY", "Only staff users can receive a mobile password");
+    }
+    if (!user.email) {
+      throw new DomainError(409, "STAFF_EMAIL_REQUIRED", "A staff email is required before setting a mobile password");
+    }
+
+    const passwordHash = await Bun.password.hash(data.password, { algorithm: "argon2id" });
+    await this.db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, userId));
+    await this.sessions.revokeAll(userId);
   }
 
   async currentUser(session: AuthenticatedSession) {

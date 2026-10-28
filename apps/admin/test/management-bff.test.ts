@@ -3,6 +3,7 @@ import { GET as getEmployees, POST as createEmployee } from '../src/app/api/admi
 import { POST as assignStore, DELETE as removeStore } from '../src/app/api/admin/employees/[id]/stores/[storeId]/route'
 import { GET as getStores, POST as createStore } from '../src/app/api/admin/stores/route'
 import { POST as activate } from '../src/app/api/admin/activation/route'
+import { POST as setPassword } from '../src/app/api/admin/employees/[id]/password/route'
 
 const originalFetch = globalThis.fetch
 const apiUrl = 'http://127.0.0.1:3000'
@@ -131,5 +132,28 @@ describe('management BFF', () => {
 		const unavailable = await activate(request('/api/admin/activation', { method: 'POST', headers: { cookie: 'vizaje_session=session' }, body: JSON.stringify({ userId, storeId }) }))
 		expect(unavailable.status).toBe(500)
 		expect(await unavailable.json()).toEqual({ error: { code: 'MANAGEMENT_REQUEST_FAILED', message: 'Запрос управления не выполнен' } })
+	})
+
+	test('provisions staff passwords through an explicit CSRF-protected auth route', async () => {
+		process.env.VIZAJE_API_URL = apiUrl
+		let target = ''
+		let captured: RequestInit | undefined
+		globalThis.fetch = (async (input, init) => {
+			target = String(input)
+			captured = init
+			return upstream(200, { success: true })
+		}) as typeof fetch
+
+		const response = await setPassword(request(`/api/admin/employees/${userId}/password`, {
+			method: 'POST',
+			headers: { cookie: 'vizaje_session=session; vizaje_csrf=csrf', 'x-csrf-token': 'csrf' },
+			body: JSON.stringify({ password: 'staff-password-123' }),
+		}), { params: Promise.resolve({ id: userId }) })
+
+		expect(response.status).toBe(200)
+		expect(target).toContain('/api/v1/auth/staff-password')
+		expect(new Headers(captured?.headers).get('cookie')).toBe('vizaje_session=session')
+		expect(new Headers(captured?.headers).get('x-csrf-token')).toBe('csrf')
+		expect(JSON.parse(String(captured?.body))).toEqual({ userId, password: 'staff-password-123' })
 	})
 })

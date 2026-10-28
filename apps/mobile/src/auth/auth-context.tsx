@@ -5,6 +5,7 @@ import {
 	getCurrentUser,
 	isNetworkError,
 	listStores,
+	mobileLogin as mobileLoginRequest,
 	logoutMobileSession,
 	redeemActivation as redeemActivationRequest,
 	renewMobileSession,
@@ -16,7 +17,7 @@ import {
 	type SecureStorage,
 	type StoredSession,
 } from './session-store'
-import type { StoreResponse, UserResponse } from '@vizaje/contracts'
+import type { MobileSessionResponse, StoreResponse, UserResponse } from '@vizaje/contracts'
 
 export type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated' | 'offline' | 'storage-error'
 
@@ -29,6 +30,7 @@ type AuthContextValue = {
 	user: AuthenticatedUser | null
 	errorMessage: string | null
 	redeemActivation: (secret: string) => Promise<void>
+	loginMobile: (email: string, password: string) => Promise<void>
 	retryRestore: () => Promise<void>
 	logout: () => Promise<LogoutResult>
 	requestAuthenticated: <T>(request: (token: string) => Promise<T>, options?: { retryUnauthorized?: boolean }) => Promise<T>
@@ -100,6 +102,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
 		const stores = await listStores(token)
 		return { ...profile, assignedStores: userDisplayStores(profile, stores.data) }
 	}, [])
+
+	const establishMobileSession = useCallback(async (response: MobileSessionResponse, deviceId: string) => {
+		const next: StoredSession = { ...response, deviceId }
+		await persistSession(next)
+		const profile = await loadProfile(next.accessToken)
+		setUser(profile)
+		setStatus('authenticated')
+	}, [loadProfile, persistSession])
 
 	const renewCurrentSession = useCallback(async (): Promise<StoredSession> => {
 		if (renewalRef.current) return renewalRef.current
@@ -183,11 +193,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 		try {
 			const deviceId = await getDeviceId()
 			const response = await redeemActivationRequest(secret, deviceId)
-			const next: StoredSession = { ...response, deviceId }
-			await persistSession(next)
-			const profile = await loadProfile(next.accessToken)
-			setUser(profile)
-			setStatus('authenticated')
+			await establishMobileSession(response, deviceId)
 		} catch (error) {
 			if (isUnauthorized(error)) {
 				await clearLocalSession()
@@ -198,7 +204,26 @@ export function AuthProvider({ children }: PropsWithChildren) {
 			setStatus(isNetworkError(error) ? 'offline' : error instanceof StorageError ? 'storage-error' : 'unauthenticated')
 			throw error
 		}
-	}, [clearLocalSession, getDeviceId, loadProfile, persistSession])
+	}, [clearLocalSession, establishMobileSession, getDeviceId])
+
+	const loginMobile = useCallback(async (email: string, password: string) => {
+		setStatus('loading')
+		setErrorMessage(null)
+		try {
+			const deviceId = await getDeviceId()
+			const response = await mobileLoginRequest(email, password, deviceId)
+			await establishMobileSession(response, deviceId)
+		} catch (error) {
+			if (error instanceof StorageError) {
+				setStatus('storage-error')
+				setErrorMessage('Не удалось безопасно сохранить сессию. Повторите попытку.')
+			} else {
+				setErrorMessage(isNetworkError(error) ? 'Нет соединения с сервером. Проверьте подключение и повторите попытку.' : 'Не удалось выполнить вход. Проверьте данные и повторите попытку.')
+				setStatus('unauthenticated')
+			}
+			throw error
+		}
+	}, [establishMobileSession, getDeviceId])
 
 	const logout = useCallback(async (): Promise<LogoutResult> => {
 		const current = sessionRef.current
@@ -247,10 +272,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
 		user,
 		errorMessage,
 		redeemActivation,
+		loginMobile,
 		retryRestore: restore,
 		logout,
 		requestAuthenticated,
-	}), [errorMessage, logout, redeemActivation, requestAuthenticated, restore, status, user])
+	}), [errorMessage, loginMobile, logout, redeemActivation, requestAuthenticated, restore, status, user])
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

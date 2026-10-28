@@ -1,9 +1,9 @@
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera'
 import { useURL } from 'expo-linking'
 import { useRouter } from 'expo-router'
-import { Camera, QrCode, ShieldCheck } from 'lucide-react-native'
+import { Camera, Eye, EyeOff, LogIn, QrCode, ShieldCheck } from 'lucide-react-native'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { ApiError, isNetworkError } from '../src/api/client'
 import { createActivationLinkGate, parseActivationPayload, type ActivationPayload } from '../src/auth/activation-payload'
 import { useAuth } from '../src/auth/auth-context'
@@ -19,14 +19,26 @@ function activationError(error: unknown): string {
 	return 'Не удалось активировать приложение. Повторите попытку или запросите новый QR-код.'
 }
 
+function loginError(error: unknown): string {
+	if (error instanceof ApiError) {
+		if (error.code === 'RATE_LIMITED' || error.status === 429) return 'Слишком много попыток. Повторите вход позже.'
+		if (isNetworkError(error)) return 'Не удалось связаться с сервером. Проверьте подключение и повторите попытку.'
+	}
+	return 'Не удалось войти. Проверьте email и пароль.'
+}
+
 export default function ActivationScreen() {
 	const router = useRouter()
 	const { colors } = useAppTheme()
-	const { redeemActivation } = useAuth()
+	const { loginMobile, redeemActivation } = useAuth()
 	const [permission, requestPermission] = useCameraPermissions()
 	const [scanning, setScanning] = useState(false)
 	const [busy, setBusy] = useState(false)
 	const [message, setMessage] = useState<string | null>(null)
+	const [loginEmail, setLoginEmail] = useState('')
+	const [loginPassword, setLoginPassword] = useState('')
+	const [showPassword, setShowPassword] = useState(false)
+	const [loginMessage, setLoginMessage] = useState<string | null>(null)
 	const [pendingLink, setPendingLink] = useState<ActivationPayload | null>(null)
 	const scanLocked = useRef(false)
 	const busyRef = useRef(false)
@@ -79,6 +91,27 @@ export default function ActivationScreen() {
 		setMessage('Активация отменена.')
 	}
 
+	const submitLogin = async () => {
+		if (busyRef.current) return
+		setMessage(null)
+		setLoginMessage(null)
+		if (!loginEmail.trim() || !loginPassword) {
+			setLoginMessage('Введите email и пароль.')
+			return
+		}
+		busyRef.current = true
+		setBusy(true)
+		try {
+			await loginMobile(loginEmail.trim(), loginPassword)
+			router.replace('/(tabs)')
+		} catch (error) {
+			setLoginMessage(loginError(error))
+		} finally {
+			busyRef.current = false
+			setBusy(false)
+		}
+	}
+
 	const startScanning = async () => {
 		setMessage(null)
 		if (Platform.OS === 'web') {
@@ -110,6 +143,7 @@ export default function ActivationScreen() {
 		{pendingLink && <Card style={styles.linkConfirmation}><Text style={[styles.confirmationTitle, { color: colors.text }]}>Подтвердите активацию</Text><Text style={[styles.confirmationBody, { color: colors.muted }]}>Ссылка активирует рабочий аккаунт на этом устройстве. Она одноразовая и действует ограниченное время.</Text><ActionButton label="Активировать приложение" onPress={confirmLinkActivation} /><ActionButton label="Отмена" variant="secondary" onPress={cancelLinkActivation} /></Card>}
 		{!pendingLink && scanning && <View style={styles.cameraShell}><CameraView style={styles.camera} facing="back" barcodeScannerSettings={{ barcodeTypes: ['qr'] }} onBarcodeScanned={scanLocked.current ? undefined : onBarcodeScanned}><View style={styles.scanOverlay}><View style={[styles.scanFrame, { borderColor: colors.onAccent }]} /><Text style={styles.scanHint}>Наведите камеру на QR-код</Text></View></CameraView><ActionButton label="Закрыть камеру" variant="secondary" onPress={() => setScanning(false)} /></View>}
 		<Card><View style={styles.infoRow}><ShieldCheck color={colors.success} size={21} /><Text style={[styles.infoText, { color: colors.text }]}>Код используется один раз и не сохраняется в приложении.</Text></View></Card>
+		{!scanning && !pendingLink && <Card style={styles.loginCard}><Text style={[styles.loginTitle, { color: colors.text }]}>Войти по электронной почте и паролю</Text><Text style={[styles.loginBody, { color: colors.muted }]}>Используйте личные данные, выданные менеджером.</Text><TextInput style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceRaised }]} value={loginEmail} onChangeText={setLoginEmail} placeholder="Электронная почта" placeholderTextColor={colors.muted} autoCapitalize="none" autoCorrect={false} autoComplete="email" keyboardType="email-address" textContentType="emailAddress" editable={!busy} returnKeyType="next" /><View style={[styles.passwordField, { borderColor: colors.border, backgroundColor: colors.surfaceRaised }]}><TextInput style={[styles.passwordInput, { color: colors.text }]} value={loginPassword} onChangeText={setLoginPassword} placeholder="Пароль" placeholderTextColor={colors.muted} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="current-password" textContentType="password" editable={!busy} returnKeyType="done" onSubmitEditing={() => void submitLogin()} /><Pressable accessibilityRole="button" accessibilityLabel={showPassword ? 'Скрыть пароль' : 'Показать пароль'} onPress={() => setShowPassword((value) => !value)} hitSlop={8}><>{showPassword ? <EyeOff color={colors.muted} size={20} /> : <Eye color={colors.muted} size={20} />}</></Pressable></View>{loginMessage && <Text accessibilityRole="alert" style={[styles.loginError, { color: colors.danger }]}>{loginMessage}</Text>}<ActionButton label={busy ? 'Выполняем вход…' : 'Войти'} icon={LogIn} disabled={busy} onPress={() => void submitLogin()} /></Card>}
 		{message && <View accessibilityRole="alert" style={[styles.message, { backgroundColor: colors.accentSoft }]}><Text style={[styles.messageText, { color: colors.text }]}>{message}</Text>{message.includes('настройках') && <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()}><Text style={[styles.settingsLink, { color: colors.text }]}>Открыть настройки</Text></Pressable>}</View>}
 		{busy ? <View style={styles.busy}><ActivityIndicator color={colors.text} /><Text style={[styles.busyText, { color: colors.muted }]}>Проверяем код активации…</Text></View> : !scanning && !pendingLink && <ActionButton label="Сканировать QR-код" icon={Camera} onPress={() => void startScanning()} />}
 		{!scanning && !pendingLink && <ActionButton label="Вернуться на главную" variant="quiet" onPress={() => router.replace('/(tabs)')} />}
@@ -136,4 +170,11 @@ const styles = StyleSheet.create({
 	linkConfirmation: { gap: 14 },
 	confirmationTitle: { fontSize: 18, fontWeight: '800' },
 	confirmationBody: { fontSize: 15, lineHeight: 22 },
+	loginCard: { gap: 12 },
+	loginTitle: { fontSize: 18, fontWeight: '800' },
+	loginBody: { fontSize: 14, lineHeight: 20 },
+	input: { minHeight: 52, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, fontSize: 16 },
+	passwordField: { minHeight: 52, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 14, paddingLeft: 14, paddingRight: 15 },
+	passwordInput: { flex: 1, minHeight: 50, paddingVertical: 0, paddingRight: 10, fontSize: 16 },
+	loginError: { fontSize: 14, lineHeight: 20 },
 })

@@ -19,6 +19,12 @@ the **Скопировать ссылку** action in the activation dialog. The
 public URL, not a secret, and must match the mobile
 `EXPO_PUBLIC_ACTIVATION_LINK_BASE_URL` setting.
 
+For a staff member, open the employee card and choose **Задать пароль** to
+provision or reset mobile email/password access. Passwords must be at least 12
+characters, are hashed by the API, and active mobile sessions are revoked
+after a change. No password is returned in employee responses or sent by
+email.
+
 ## Checks
 
 ```bash

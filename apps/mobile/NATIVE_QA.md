@@ -58,6 +58,7 @@
 | 5 | Deep link `vizaje://activate` | Ссылка открывает приложение, показывает подтверждение и обрабатывается как activation payload | |
 | 6 | Одноразовая активация | Валидный QR активирует сотрудника; повторное использование отклоняется | |
 | 7 | Неверный/просроченный QR | Показана generic ошибка, secret не сохраняется и не логируется | |
+| 7a | Staff email/password login | Валидный staff email/password создаёт mobile session; неверные данные, inactive account и manager/admin получают generic ошибку | |
 | 8 | Persistence после restart | После закрытия и повторного запуска валидная mobile session восстанавливается через SecureStore | |
 | 9 | Session rotation | При истекшем access token выполняется renewal; новый token сохраняется, старый не используется | |
 | 10 | Revoked session | После revoke на API приложение прекращает доступ и возвращает к активации | |

@@ -6,7 +6,9 @@ import {
   activationRequestSchema,
   adminLoginRequestSchema,
   logoutResponseSchema,
+  mobileLoginRequestSchema,
   sessionListResponseSchema,
+  staffPasswordRequestSchema,
 } from "@vizaje/contracts";
 import type { AuthService } from "../auth/service";
 import { BROWSER_CSRF_COOKIE, BROWSER_SESSION_COOKIE } from "../auth/session-service";
@@ -71,6 +73,18 @@ export function registerAuthRoutes(app: Hono, options: AuthRoutesOptions): void 
     });
 
     return context.json({ user: result.user, expiresAt: result.session.expiresAt.toISOString() }, 200);
+  });
+
+  app.post("/api/v1/auth/mobile/login", async (context) => {
+    const input = parseInput(mobileLoginRequestSchema, await parseJson(context));
+    return context.json(await auth.mobileLogin(input, { userAgent: context.req.header("User-Agent") }), 201);
+  });
+
+  app.post("/api/v1/auth/staff-password", async (context) => {
+    const principal = await requirePrincipal(auth, context);
+    const input = parseInput(staffPasswordRequestSchema, await parseJson(context));
+    await auth.setStaffPassword(principal, input.userId, input.password);
+    return context.json(logoutResponseSchema.parse({ success: true }), 200);
   });
 
   app.post("/api/v1/auth/logout", async (context) => {

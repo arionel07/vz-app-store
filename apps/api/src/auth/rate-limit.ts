@@ -80,6 +80,12 @@ export const defaultLoginRateLimiter = new InMemoryRateLimiter({
   blockMs: 5 * 60_000,
 });
 
+export const defaultMobileLoginRateLimiter = new InMemoryRateLimiter({
+  maxAttempts: 5,
+  windowMs: 60_000,
+  blockMs: 5 * 60_000,
+});
+
 export const defaultActivationRateLimiter = new InMemoryRateLimiter({
   maxAttempts: 10,
   windowMs: 60_000,

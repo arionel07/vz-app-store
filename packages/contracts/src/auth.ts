@@ -6,6 +6,18 @@ export const adminLoginRequestSchema = z.object({
   password: z.string().min(1).max(256),
 });
 
+export const mobileLoginRequestSchema = adminLoginRequestSchema.extend({
+  deviceId: z.string().trim().min(1).max(200),
+});
+
+export const setUserPasswordRequestSchema = z.object({
+  password: z.string().min(12).max(256),
+});
+
+export const staffPasswordRequestSchema = setUserPasswordRequestSchema.extend({
+  userId: z.string().uuid(),
+});
+
 export const authSessionUserSchema = userResponseSchema;
 
 export const browserLoginResponseSchema = z.object({
@@ -55,6 +67,9 @@ export const sessionListResponseSchema = z.object({
 export const logoutResponseSchema = z.object({ success: z.literal(true) });
 
 export type AdminLoginRequest = z.infer<typeof adminLoginRequestSchema>;
+export type MobileLoginRequest = z.infer<typeof mobileLoginRequestSchema>;
+export type SetUserPasswordRequest = z.infer<typeof setUserPasswordRequestSchema>;
+export type StaffPasswordRequest = z.infer<typeof staffPasswordRequestSchema>;
 export type ActivationRequest = z.infer<typeof activationRequestSchema>;
 export type ActivationRedeemRequest = z.infer<typeof activationRedeemRequestSchema>;
 export type BrowserLoginResponse = z.infer<typeof browserLoginResponseSchema>;

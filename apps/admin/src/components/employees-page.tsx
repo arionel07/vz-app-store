@@ -1,12 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Edit3, LoaderCircle, Plus, QrCode, RefreshCw, Search, UserRound } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Edit3, Eye, EyeOff, KeyRound, LoaderCircle, Plus, QrCode, RefreshCw, Search, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import {
 	activationRequestSchema,
 	activationResponseSchema,
 	createUserSchema,
+	logoutResponseSchema,
+	setUserPasswordRequestSchema,
 	storeListResponseSchema,
 	updateUserSchema,
 	userListResponseSchema,
@@ -40,12 +42,18 @@ type FormState = {
 
 type Activation = { payload: string; expiresAt: string }
 
+type PasswordForm = { password: string; confirmation: string }
+
 function initials(employee: UserResponse): string {
 	return `${employee.firstName[0] ?? ''}${employee.lastName[0] ?? ''}`.toUpperCase()
 }
 
 function emptyForm(): FormState {
 	return { firstName: '', lastName: '', phone: '', email: '', role: 'staff', isActive: true, storeIds: [] }
+}
+
+function emptyPasswordForm(): PasswordForm {
+	return { password: '', confirmation: '' }
 }
 
 function formFromEmployee(employee: UserResponse): FormState {
@@ -67,6 +75,8 @@ function errorMessage(error: unknown): string {
 	if (error.code === 'MEMBERSHIP_EXISTS') return 'Сотрудник уже назначен в этот магазин'
 	if (error.code === 'MEMBERSHIP_NOT_FOUND') return 'Назначение магазина уже удалено'
 	if (error.code === 'ACTIVATION_UNAVAILABLE') return 'Для этого сотрудника активация сейчас недоступна'
+	if (error.code === 'STAFF_EMAIL_REQUIRED') return 'Сначала укажите email сотрудника'
+	if (error.code === 'STAFF_PASSWORD_ONLY') return 'Пароль мобильного входа доступен только сотрудникам'
 	if (error.code === 'RATE_LIMITED') return 'Слишком много запросов. Попробуйте позже'
 	if (error.status === 403) return 'У вас нет прав для этой операции'
 	if (error.status === 401) return 'Сеанс завершён. Выполните вход снова'
@@ -89,9 +99,14 @@ export function EmployeesPage() {
 	const [error, setError] = useState<string | null>(null)
 	const [detailLoading, setDetailLoading] = useState(false)
 	const [dialog, setDialog] = useState<'create' | 'edit' | null>(null)
+	const [passwordDialog, setPasswordDialog] = useState(false)
 	const [form, setForm] = useState<FormState>(emptyForm)
+	const [passwordForm, setPasswordForm] = useState<PasswordForm>(emptyPasswordForm)
 	const [formError, setFormError] = useState<string | null>(null)
+	const [passwordError, setPasswordError] = useState<string | null>(null)
 	const [saving, setSaving] = useState(false)
+	const [passwordSaving, setPasswordSaving] = useState(false)
+	const [showPassword, setShowPassword] = useState(false)
 	const [actionId, setActionId] = useState<string | null>(null)
 	const [activation, setActivation] = useState<Activation | null>(null)
 	const [activationStoreId, setActivationStoreId] = useState('')
@@ -154,6 +169,18 @@ export function EmployeesPage() {
 		setDialog('edit')
 	}
 
+	function openPasswordDialog() {
+		if (!selected || selected.role !== 'staff') return
+		setPasswordForm(emptyPasswordForm())
+		setPasswordError(null)
+		setShowPassword(false)
+		setPasswordDialog(true)
+	}
+
+	function closePasswordDialog() {
+		if (!passwordSaving) setPasswordDialog(false)
+	}
+
 	function closeDialog() {
 		if (!saving) setDialog(null)
 	}
@@ -203,6 +230,32 @@ export function EmployeesPage() {
 			setFormError(requestError instanceof Error && requestError.message === 'FORM_INVALID' ? 'Проверьте обязательные поля и формат контактов' : errorMessage(requestError))
 		} finally {
 			setSaving(false)
+		}
+	}
+
+	async function savePassword(event: React.FormEvent<HTMLFormElement>) {
+		event.preventDefault()
+		if (!selected || selected.role !== 'staff') return
+		setPasswordError(null)
+		if (passwordForm.password !== passwordForm.confirmation) {
+			setPasswordError('Пароли не совпадают')
+			return
+		}
+		const parsed = setUserPasswordRequestSchema.safeParse({ password: passwordForm.password })
+		if (!parsed.success) {
+			setPasswordError('Пароль должен содержать не менее 12 символов')
+			return
+		}
+		setPasswordSaving(true)
+		try {
+			await managementFetch(`/api/admin/employees/${selected.id}/password`, logoutResponseSchema, { method: 'POST', body: JSON.stringify(parsed.data) })
+			setPasswordDialog(false)
+			await loadData()
+			toast.success('Пароль сохранён. Активные мобильные сессии отозваны')
+		} catch (requestError) {
+			setPasswordError(errorMessage(requestError))
+		} finally {
+			setPasswordSaving(false)
 		}
 	}
 
@@ -262,11 +315,12 @@ export function EmployeesPage() {
 					{loading ? <div className="management-state"><div><LoaderCircle className="mx-auto animate-spin text-muted-foreground" /><p>Загружаем сотрудников…</p></div></div> : employees.length === 0 ? <div className="management-state"><div><UserRound className="mx-auto text-muted-foreground" /><strong>Сотрудники не найдены</strong><p>Измените фильтры или добавьте сотрудника с реальными данными.</p></div></div> : <><Table className="management-table"><TableHeader><TableRow><TableHead>Сотрудник</TableHead><TableHead>Роль</TableHead><TableHead>Магазины</TableHead><TableHead>Изменён</TableHead><TableHead>Статус</TableHead><TableHead aria-label="Действия" /></TableRow></TableHeader><TableBody>{employees.map((employee) => <TableRow key={employee.id} aria-selected={selected?.id === employee.id} onClick={() => void selectEmployee(employee)}><TableCell><div className="employee-name-cell"><span className="avatar avatar-slate">{initials(employee)}</span><div><strong>{employee.firstName} {employee.lastName}</strong><small>{employee.email ?? employee.phone ?? 'Контакт не указан'}</small></div></div></TableCell><TableCell>{roleLabels[employee.role]}</TableCell><TableCell>{employee.storeIds.length}</TableCell><TableCell className="cell-muted">{formatDate(employee.updatedAt)}</TableCell><TableCell><Badge tone={employee.isActive ? 'green' : 'danger'}>{employee.isActive ? 'Активен' : 'Неактивен'}</Badge></TableCell><TableCell className="actions-cell"><button type="button" className="row-more" aria-label={`Изменить ${employee.firstName} ${employee.lastName}`} onClick={(event) => { event.stopPropagation(); void selectEmployee(employee).then(() => openEdit()) }}><Edit3 size={15} /></button></TableCell></TableRow>)}</TableBody></Table><div className="management-pagination"><span>{pagination.total === 0 ? 'Нет сотрудников' : `${(pagination.page - 1) * pagination.pageSize + 1}–${Math.min(pagination.page * pagination.pageSize, pagination.total)} из ${pagination.total}`}</span><div className="management-pagination-actions"><button type="button" aria-label="Предыдущая страница" disabled={page <= 1 || loading} onClick={() => setPage((value) => Math.max(1, value - 1))}><ChevronLeft size={15} /></button><span>{page} / {Math.max(pagination.totalPages, 1)}</span><button type="button" aria-label="Следующая страница" disabled={page >= pagination.totalPages || loading} onClick={() => setPage((value) => value + 1)}><ChevronRight size={15} /></button></div></div></>}
 				</section>
 				<aside className="management-surface management-inspector" aria-label="Карточка сотрудника">
-					{!selected ? <div className="management-state"><div><UserRound className="mx-auto text-muted-foreground" /><p>Выберите сотрудника, чтобы увидеть детали.</p></div></div> : <><div className="panel-header"><div><p className="eyebrow">Карточка</p><h2 className="panel-title">{selected.firstName} {selected.lastName}</h2></div><Button variant="ghost" size="icon-sm" aria-label="Редактировать сотрудника" onClick={openEdit}><Edit3 /></Button></div><div className="panel-content"><div className="flex items-center gap-3"><span className="avatar avatar-slate">{initials(selected)}</span><div><strong>{roleLabels[selected.role]}</strong><p className="panel-description">{selected.isActive ? 'Доступ активен' : 'Доступ отключён'}</p></div></div><dl className="management-meta"><div><dt>Email</dt><dd>{selected.email ?? '—'}</dd></div><div><dt>Телефон</dt><dd>{selected.phone ?? '—'}</dd></div><div><dt>Магазины</dt><dd>{selectedStoreNames.length ? selectedStoreNames.join(', ') : 'Не назначены'}</dd></div><div><dt>Обновлён</dt><dd>{detailLoading ? 'Загрузка…' : formatDate(selected.updatedAt)}</dd></div></dl><div className="management-actions"><Button variant="outline" size="sm" onClick={openEdit}><Edit3 size={14} />Изменить</Button><Button variant={selected.isActive ? 'destructive' : 'outline'} size="sm" disabled={actionId === selected.id} onClick={() => void toggleActive()}>{actionId === selected.id && <LoaderCircle size={14} className="animate-spin" />}{selected.isActive ? 'Деактивировать' : 'Активировать'}</Button></div>{selected.role === 'staff' && selected.isActive && <div className="border-t border-border pt-3"><p className="eyebrow">Активация приложения</p>{availableActivationStores.length ? <><label className="form-field"><span>Магазин для активации</span><Select value={activationStoreId} onChange={(event) => setActivationStoreId(event.target.value)}><option value="">Выберите магазин</option>{availableActivationStores.map((store) => <option key={store.id} value={store.id}>{store.name} · {store.code}</option>)}</Select></label><Button className="mt-2 w-full" size="sm" disabled={!activationStoreId || actionId === selected.id} onClick={() => void generateActivation()}><QrCode size={14} />Сгенерировать QR</Button></> : <p className="role-note">Назначьте сотруднику активный магазин, чтобы создать код.</p>}</div>}</div></>}
+					{!selected ? <div className="management-state"><div><UserRound className="mx-auto text-muted-foreground" /><p>Выберите сотрудника, чтобы увидеть детали.</p></div></div> : <><div className="panel-header"><div><p className="eyebrow">Карточка</p><h2 className="panel-title">{selected.firstName} {selected.lastName}</h2></div><Button variant="ghost" size="icon-sm" aria-label="Редактировать сотрудника" onClick={openEdit}><Edit3 /></Button></div><div className="panel-content"><div className="flex items-center gap-3"><span className="avatar avatar-slate">{initials(selected)}</span><div><strong>{roleLabels[selected.role]}</strong><p className="panel-description">{selected.isActive ? 'Доступ активен' : 'Доступ отключён'}</p></div></div><dl className="management-meta"><div><dt>Email</dt><dd>{selected.email ?? '—'}</dd></div><div><dt>Телефон</dt><dd>{selected.phone ?? '—'}</dd></div><div><dt>Магазины</dt><dd>{selectedStoreNames.length ? selectedStoreNames.join(', ') : 'Не назначены'}</dd></div><div><dt>Обновлён</dt><dd>{detailLoading ? 'Загрузка…' : formatDate(selected.updatedAt)}</dd></div></dl><div className="management-actions"><Button variant="outline" size="sm" onClick={openEdit}><Edit3 size={14} />Изменить</Button>{selected.role === 'staff' && <Button variant="outline" size="sm" onClick={openPasswordDialog}><KeyRound size={14} />Задать пароль</Button>}<Button variant={selected.isActive ? 'destructive' : 'outline'} size="sm" disabled={actionId === selected.id} onClick={() => void toggleActive()}>{actionId === selected.id && <LoaderCircle size={14} className="animate-spin" />}{selected.isActive ? 'Деактивировать' : 'Активировать'}</Button></div>{selected.role === 'staff' && selected.isActive && <div className="border-t border-border pt-3"><p className="eyebrow">Активация приложения</p>{availableActivationStores.length ? <><label className="form-field"><span>Магазин для активации</span><Select value={activationStoreId} onChange={(event) => setActivationStoreId(event.target.value)}><option value="">Выберите магазин</option>{availableActivationStores.map((store) => <option key={store.id} value={store.id}>{store.name} · {store.code}</option>)}</Select></label><Button className="mt-2 w-full" size="sm" disabled={!activationStoreId || actionId === selected.id} onClick={() => void generateActivation()}><QrCode size={14} />Сгенерировать QR</Button></> : <p className="role-note">Назначьте сотруднику активный магазин, чтобы создать код.</p>}</div>}</div></>}
 				</aside>
 			</div>
 
 			<Dialog open={dialog !== null} onClose={closeDialog} title={dialog === 'create' ? 'Новый сотрудник' : 'Редактировать сотрудника'} className="max-w-[680px]"><form className="dialog-form" onSubmit={saveEmployee}><div className="form-grid"><div className="form-field"><label htmlFor="employee-first-name">Имя</label><Input id="employee-first-name" value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} autoComplete="given-name" required /></div><div className="form-field"><label htmlFor="employee-last-name">Фамилия</label><Input id="employee-last-name" value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} autoComplete="family-name" required /></div><div className="form-field"><label htmlFor="employee-email">Email</label><Input id="employee-email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} autoComplete="email" placeholder="name@example.com" /></div><div className="form-field"><label htmlFor="employee-phone">Телефон</label><Input id="employee-phone" type="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} autoComplete="tel" placeholder="+79991234567" /></div><div className="form-field"><label htmlFor="employee-form-role">Роль</label><Select id="employee-form-role" value={form.role} disabled={dialog === 'edit' && selected?.role === 'manager'} onChange={(event) => setForm({ ...form, role: userRoleSchema.parse(event.target.value) })}><option value="staff">Сотрудник</option><option value="manager">Менеджер</option><option value="admin">Администратор</option></Select>{dialog === 'edit' && selected?.role === 'manager' && <p className="role-note">Менеджер может управлять только сотрудниками в своей области.</p>}</div><div className="form-field"><label className="flex items-center gap-2"><input type="checkbox" className="checkbox-control" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />Доступ активен</label></div><div className="form-field form-field-full"><fieldset><legend>Магазины сотрудника</legend><div className="store-checklist">{stores.length ? stores.map((store) => <label className="store-check" key={store.id}><input type="checkbox" checked={form.storeIds.includes(store.id)} onChange={() => toggleStore(store.id)} /><span>{store.name}</span><small className="ml-auto text-muted-foreground">{store.code}</small></label>) : <p className="role-note">Активные магазины не найдены или недоступны вашей роли.</p>}</div></fieldset></div></div>{formError && <div className="management-error mt-3" role="alert">{formError}</div>}<div className="form-actions"><Button type="button" variant="ghost" onClick={closeDialog} disabled={saving}>Отмена</Button><Button type="submit" disabled={saving}>{saving && <LoaderCircle size={14} className="animate-spin" />}Сохранить</Button></div></form></Dialog>
+			<Dialog open={passwordDialog} onClose={closePasswordDialog} title="Пароль мобильного входа" className="max-w-[460px]"><form className="dialog-form" onSubmit={savePassword}><p className="panel-description">Пароль сохраняется только в виде защищённого хеша. После изменения активные мобильные сессии сотрудника будут отозваны.</p><div className="form-field"><label htmlFor="employee-password">Новый пароль</label><div className="relative"><Input id="employee-password" type={showPassword ? 'text' : 'password'} value={passwordForm.password} onChange={(event) => setPasswordForm({ ...passwordForm, password: event.target.value })} autoComplete="new-password" minLength={12} maxLength={256} required className="pr-11" /><button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></div><div className="form-field"><label htmlFor="employee-password-confirm">Повторите пароль</label><Input id="employee-password-confirm" type={showPassword ? 'text' : 'password'} value={passwordForm.confirmation} onChange={(event) => setPasswordForm({ ...passwordForm, confirmation: event.target.value })} autoComplete="new-password" minLength={12} maxLength={256} required /></div>{passwordError && <div className="management-error mt-3" role="alert">{passwordError}</div>}<div className="form-actions"><Button type="button" variant="ghost" onClick={closePasswordDialog} disabled={passwordSaving}>Отмена</Button><Button type="submit" disabled={passwordSaving}>{passwordSaving && <LoaderCircle size={14} className="animate-spin" />}Сохранить пароль</Button></div></form></Dialog>
 			<Dialog open={activation !== null} onClose={closeActivation} title="Активация приложения" className="max-w-[390px]">{activation && <ActivationQr payload={activation.payload} expiresAt={activation.expiresAt} />}<div className="form-actions"><Button type="button" onClick={closeActivation}><Check size={14} />Готово</Button></div></Dialog>
 		</div>
 	)

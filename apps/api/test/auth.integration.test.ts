@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { and, eq, inArray } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { createAuthService, type AuthService } from "../src/auth/service";
+import { InMemoryRateLimiter } from "../src/auth/rate-limit";
 import { loadEnv } from "../src/config/env";
 import { createDatabase } from "../src/db/client";
 import { activationTokens, sessions, stores, users } from "../src/db/schema";
@@ -43,10 +44,14 @@ suite("Authentication PostgreSQL integration", () => {
   let inactiveManagerId: string;
   let staffAId: string;
   let staffBId: string;
+  let inactiveStaffId: string;
   let storeAId: string;
   let storeBId: string;
   let adminEmail: string;
   let inactiveManagerEmail: string;
+  let staffEmail: string;
+  let staffBEmail: string;
+  let inactiveStaffEmail: string;
   const adminPassword = "integration-admin-password";
 
   beforeAll(async () => {
@@ -110,7 +115,7 @@ suite("Authentication PostgreSQL integration", () => {
       firstName: "Auth",
       lastName: "Staff A",
       phone: `+37368${suffix.slice(-7)}`,
-      email: null,
+      email: `staff-a-${suffix}@example.com`,
       role: "staff",
       isActive: true,
       storeIds: [storeAId],
@@ -119,17 +124,31 @@ suite("Authentication PostgreSQL integration", () => {
       firstName: "Auth",
       lastName: "Staff B",
       phone: `+37367${suffix.slice(-7)}`,
-      email: null,
+      email: `staff-b-${suffix}@example.com`,
       role: "staff",
       isActive: true,
       storeIds: [storeBId],
     });
     staffAId = staffA.id;
     staffBId = staffB.id;
+    staffEmail = staffA.email!;
+    staffBEmail = staffB.email!;
+
+    const inactiveStaff = await usersService.createUser(adminPrincipal, {
+      firstName: "Inactive",
+      lastName: "Staff",
+      phone: `+37365${suffix.slice(-7)}`,
+      email: `inactive-staff-${suffix}@example.com`,
+      role: "staff",
+      isActive: false,
+      storeIds: [storeAId],
+    });
+    inactiveStaffId = inactiveStaff.id;
+    inactiveStaffEmail = inactiveStaff.email!;
   });
 
   afterAll(async () => {
-    const userIds = [adminId, managerId, inactiveManagerId, staffAId, staffBId].filter(Boolean);
+    const userIds = [adminId, managerId, inactiveManagerId, staffAId, staffBId, inactiveStaffId].filter(Boolean);
     const storeIds = [storeAId, storeBId].filter(Boolean);
     if (userIds.length > 0) await db.delete(activationTokens).where(inArray(activationTokens.userId, userIds));
     if (userIds.length > 0) await db.delete(sessions).where(inArray(sessions.userId, userIds));
@@ -209,6 +228,92 @@ suite("Authentication PostgreSQL integration", () => {
       body: JSON.stringify({ email: adminEmail, password: adminPassword }),
     });
     expect(secureLogin.headers.get("set-cookie")).toContain("Secure");
+  });
+
+  test("authenticates staff with mobile passwords and keeps browser roles out", async () => {
+    const app = createApp({
+      db,
+      allowedOrigins: ["http://localhost:3001"],
+      managementServices: { users: usersService, stores: storesService },
+      resolvePrincipal: auth.principalResolver(),
+      authRoutes: { auth, secureCookies: false },
+      logger: noopLogger,
+    });
+
+    const browserLogin = await app.request("http://localhost/api/v1/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: adminEmail, password: adminPassword }),
+    });
+    const browserCookieHeader = browserLogin.headers.get("set-cookie");
+    const browserCookie = `vizaje_session=${cookieValue(browserCookieHeader, "vizaje_session")}; vizaje_csrf=${cookieValue(browserCookieHeader, "vizaje_csrf")}`;
+    const csrfFailure = await app.request("http://localhost/api/v1/auth/staff-password", {
+      method: "POST",
+      headers: { Cookie: browserCookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: staffAId, password: "staff-password-123" }),
+    });
+    expect(csrfFailure.status).toBe(403);
+    const provisioned = await app.request("http://localhost/api/v1/auth/staff-password", {
+      method: "POST",
+      headers: { Cookie: browserCookie, "X-CSRF-Token": cookieValue(browserCookieHeader, "vizaje_csrf"), "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: staffAId, password: "staff-password-123" }),
+    });
+    expect(provisioned.status).toBe(200);
+    await auth.setStaffPassword(adminPrincipal, inactiveStaffId, "inactive-password-123");
+
+    const successfulLogin = await app.request("http://localhost/api/v1/auth/mobile/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: staffEmail, password: "staff-password-123", deviceId: "mobile-login-device" }),
+    });
+    expect(successfulLogin.status).toBe(201);
+    expect(successfulLogin.headers.get("set-cookie")).toBeNull();
+    const mobileSession = await successfulLogin.json();
+    expect(mobileSession.user.id).toBe(staffAId);
+    expect(mobileSession.user.passwordHash).toBeUndefined();
+    const authenticated = await auth.sessions.authenticateToken(mobileSession.accessToken);
+    expect(authenticated?.type).toBe("mobile");
+
+    const invalidLogin = await app.request("http://localhost/api/v1/auth/mobile/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: staffEmail, password: "wrong-password", deviceId: "invalid-device" }),
+    });
+    const missingPassword = await app.request("http://localhost/api/v1/auth/mobile/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: staffBEmail, password: "staff-password-123", deviceId: "missing-password-device" }),
+    });
+    const inactiveLogin = await app.request("http://localhost/api/v1/auth/mobile/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: inactiveStaffEmail, password: "inactive-password-123", deviceId: "inactive-device" }),
+    });
+    const managerLogin = await app.request("http://localhost/api/v1/auth/mobile/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: `manager-${adminEmail.split("-").at(-1)?.split("@")[0]}@example.com`, password: "manager-password", deviceId: "manager-device" }),
+    });
+    expect(invalidLogin.status).toBe(401);
+    expect(missingPassword.status).toBe(401);
+    expect(inactiveLogin.status).toBe(401);
+    expect(managerLogin.status).toBe(401);
+    expect(await invalidLogin.json()).toEqual(await managerLogin.json());
+
+    await expect(auth.setStaffPassword({ userId: managerId, role: "manager", storeIds: [storeAId], isActive: true }, staffBId, "cross-store-password-123"))
+      .rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
+
+    const limitedAuth = createAuthService(db, {
+      mobileLoginRateLimiter: new InMemoryRateLimiter({ maxAttempts: 1, windowMs: 60_000, blockMs: 60_000 }),
+    });
+    await expect(limitedAuth.mobileLogin({ email: staffEmail, password: "wrong-password", deviceId: "rate-device-a" })).rejects.toMatchObject({ code: "INVALID_CREDENTIALS" });
+    await expect(limitedAuth.mobileLogin({ email: staffEmail, password: "staff-password-123", deviceId: "rate-device-b" })).rejects.toMatchObject({ code: "INVALID_CREDENTIALS" });
+
+    const renewed = await auth.renewMobileSession(authenticated!);
+    expect(renewed.accessToken).not.toBe(mobileSession.accessToken);
+    const renewedSession = await auth.sessions.authenticateToken(renewed.accessToken);
+    await auth.sessions.revoke(renewedSession!.id, staffAId);
+    expect(await auth.sessions.authenticateToken(renewed.accessToken)).toBeNull();
   });
 
   test("creates, expires, and atomically consumes staff activations", async () => {

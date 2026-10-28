@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { getAvailableQuiz, getCurrentUser, listAvailableQuizzes, listMyAttempts, redeemActivation, startQuizAttempt, submitQuizAttempt, uploadPhoto } from '../src/api/client'
+import { getAvailableQuiz, getCurrentUser, listAvailableQuizzes, listMyAttempts, mobileLogin, redeemActivation, startQuizAttempt, submitQuizAttempt, uploadPhoto } from '../src/api/client'
 
 process.env.EXPO_PUBLIC_API_URL ??= 'http://127.0.0.1:3000'
 
@@ -33,6 +33,18 @@ describe('mobile API client', () => {
 			return new Response(JSON.stringify({ error: { code: 'INVALID_ACTIVATION', message: 'invalid' } }), { status: 401 })
 		}) as typeof fetch
 		await expect(redeemActivation('secret', 'device-a')).rejects.toMatchObject({ status: 401, code: 'INVALID_ACTIVATION' })
+		expect(calls).toBe(1)
+	})
+
+	test('logs mobile staff in with the device id and does not retry credentials', async () => {
+		let calls = 0
+		globalThis.fetch = (async (_input, init) => {
+			calls += 1
+			expect(init?.method).toBe('POST')
+			expect(JSON.parse(String(init?.body))).toEqual({ email: 'staff@example.com', password: 'private-password', deviceId: 'device-a' })
+			return new Response(JSON.stringify({ error: { code: 'INVALID_CREDENTIALS', message: 'invalid' } }), { status: 401 })
+		}) as typeof fetch
+		await expect(mobileLogin('staff@example.com', 'private-password', 'device-a')).rejects.toMatchObject({ status: 401, code: 'INVALID_CREDENTIALS' })
 		expect(calls).toBe(1)
 	})
 

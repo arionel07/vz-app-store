@@ -2,6 +2,7 @@ import {
 	activationRedeemRequestSchema,
 	errorResponseSchema,
 	logoutResponseSchema,
+	mobileLoginRequestSchema,
 	mobileSessionResponseSchema,
 	staffQuizListResponseSchema,
 	quizStaffResponseSchema,
@@ -124,6 +125,11 @@ async function requestJson<T>(path: string, schema: ResponseSchema<T>, options: 
 export function redeemActivation(secret: string, deviceId: string): Promise<MobileSessionResponse> {
 	const body = activationRedeemRequestSchema.parse({ secret, deviceId })
 	return requestJson('/api/v1/auth/activation/redeem', mobileSessionResponseSchema, { method: 'POST', body })
+}
+
+export function mobileLogin(email: string, password: string, deviceId: string): Promise<MobileSessionResponse> {
+	const body = mobileLoginRequestSchema.parse({ email, password, deviceId })
+	return requestJson('/api/v1/auth/mobile/login', mobileSessionResponseSchema, { method: 'POST', body })
 }
 
 export function getCurrentUser(token: string): Promise<UserResponse> {
