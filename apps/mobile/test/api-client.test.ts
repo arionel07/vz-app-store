@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { getAvailableQuiz, getCurrentUser, listAvailableQuizzes, listMyAttempts, redeemActivation, startQuizAttempt, submitQuizAttempt, uploadPhoto } from '../src/api/client'
 
+process.env.EXPO_PUBLIC_API_URL ??= 'http://127.0.0.1:3000'
+
 const originalFetch = globalThis.fetch
 const user = {
 	id: '11111111-1111-4111-8111-111111111111', firstName: 'Тест', lastName: 'Сотрудник', phone: '+70000000000', email: null,
@@ -50,6 +52,17 @@ describe('mobile API client', () => {
 		}) as unknown as typeof fetch
 		await expect(getCurrentUser('access-token')).rejects.toMatchObject({ status: 0, code: 'NETWORK_UNAVAILABLE', message: 'Сервис временно недоступен' })
 		expect(calls).toBe(2)
+	})
+
+	test('requires an explicit API origin instead of assuming localhost', async () => {
+		const configured = process.env.EXPO_PUBLIC_API_URL
+		delete process.env.EXPO_PUBLIC_API_URL
+		try {
+			await expect(getCurrentUser('access-token')).rejects.toMatchObject({ status: 0, code: 'API_URL_REQUIRED' })
+		} finally {
+			if (configured === undefined) delete process.env.EXPO_PUBLIC_API_URL
+			else process.env.EXPO_PUBLIC_API_URL = configured
+		}
 	})
 
 	test('uses staff quiz and attempt endpoints with shared response validation', async () => {

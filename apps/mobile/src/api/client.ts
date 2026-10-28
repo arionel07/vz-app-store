@@ -42,10 +42,11 @@ export function isNetworkError(error: unknown): error is ApiError {
 }
 
 function apiOrigin(): string {
-	const configured = process.env.EXPO_PUBLIC_API_URL?.trim() || 'http://127.0.0.1:3000'
+	const configured = process.env.EXPO_PUBLIC_API_URL?.trim()
+	if (!configured) throw new ApiError(0, 'API_URL_REQUIRED', 'Адрес API не настроен')
 	try {
 		const url = new URL(configured)
-		const localDevelopment = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]'
+		const localDevelopment = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]' || url.hostname === '10.0.2.2'
 		if (url.protocol !== 'https:' && !(url.protocol === 'http:' && localDevelopment)) throw new Error('API must use HTTPS outside local development')
 		return url.toString().replace(/\/$/, '')
 	} catch {

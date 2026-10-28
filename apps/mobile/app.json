@@ -4,7 +4,7 @@
     "slug": "vizaje-staff",
     "version": "0.1.0",
     "orientation": "portrait",
-    "scheme": "vizaje-staff",
+    "scheme": "vizaje",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "jsEngine": "hermes",
@@ -14,6 +14,7 @@
         "expo-camera",
         {
           "cameraPermission": "Vizaje Staff использует камеру для сканирования QR-кода активации.",
+          "microphonePermission": false,
           "recordAudioAndroid": false
         }
       ],
@@ -24,11 +25,24 @@
           "cameraPermission": "Vizaje Staff использует камеру для рабочего отчёта.",
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true,
+          "faceIDPermission": false
+        }
       ]
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.vizaje.staff"
+      "bundleIdentifier": "com.vizaje.staff",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSAllowsLocalNetworking": true
+        }
+      }
     },
     "android": {
       "package": "com.vizaje.staff",
