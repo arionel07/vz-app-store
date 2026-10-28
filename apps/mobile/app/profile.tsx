@@ -32,29 +32,29 @@ export default function ProfileScreen() {
 	return <Screen>
 		<ScreenHeader title="Профиль" subtitle="Данные текущего сотрудника." back backFallback="/(tabs)" />
 		<View style={styles.identity}><View style={[styles.avatar, { backgroundColor: colors.accent }]}><Text style={[styles.avatarText, { color: colors.onAccent }]}>{initials}</Text></View><View style={styles.identityCopy}><Text style={[styles.name, { color: colors.text }]}>{user.firstName} {user.lastName}</Text><Text style={[styles.muted, { color: colors.muted }]}>{user.email ?? 'Email не указан'}</Text></View></View>
-		<View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={styles.infoRow}><UserRound color={colors.muted} size={19} /><View><Text style={[styles.infoLabel, { color: colors.muted }]}>Роль</Text><Text style={[styles.infoValue, { color: colors.text }]}>{roleLabels[user.role]}</Text></View></View><View style={[styles.divider, { backgroundColor: colors.border }]} /><View style={styles.infoRow}><Smartphone color={colors.muted} size={19} /><View style={styles.storeCopy}><Text style={[styles.infoLabel, { color: colors.muted }]}>Активные магазины</Text>{user.assignedStores.length === 0 ? <Text style={[styles.infoValue, { color: colors.text }]}>Нет активных назначений</Text> : user.assignedStores.map((store) => <Text key={store.id} style={[styles.infoValue, { color: colors.text }]}>{store.name} · {store.code}</Text>)}</View></View><View style={[styles.divider, { backgroundColor: colors.border }]} /><View style={styles.infoRow}><Text style={[styles.statusDot, { color: user.isActive ? colors.success : colors.danger }]}>●</Text><View><Text style={[styles.infoLabel, { color: colors.muted }]}>Статус аккаунта</Text><Text style={[styles.infoValue, { color: colors.text }]}>{user.isActive ? 'Активен' : 'Неактивен'}</Text></View></View></View>
+		<View style={[styles.infoCard, { backgroundColor: colors.surfaceRaised }]}><View style={styles.infoRow}><UserRound color={colors.muted} size={19} /><View><Text style={[styles.infoLabel, { color: colors.muted }]}>Роль</Text><Text style={[styles.infoValue, { color: colors.text }]}>{roleLabels[user.role]}</Text></View></View><View style={[styles.divider, { backgroundColor: colors.border }]} /><View style={styles.infoRow}><Smartphone color={colors.muted} size={19} /><View style={styles.storeCopy}><Text style={[styles.infoLabel, { color: colors.muted }]}>Активные магазины</Text>{user.assignedStores.length === 0 ? <Text style={[styles.infoValue, { color: colors.text }]}>Нет активных назначений</Text> : user.assignedStores.map((store) => <Text key={store.id} style={[styles.infoValue, { color: colors.text }]}>{store.name} · {store.code}</Text>)}</View></View><View style={[styles.divider, { backgroundColor: colors.border }]} /><View style={styles.infoRow}><Text style={[styles.statusDot, { color: user.isActive ? colors.success : colors.danger }]}>●</Text><View><Text style={[styles.infoLabel, { color: colors.muted }]}>Статус аккаунта</Text><Text style={[styles.infoValue, { color: colors.text }]}>{user.isActive ? 'Активен' : 'Неактивен'}</Text></View></View></View>
 		<SectionTitle>Внешний вид</SectionTitle>
-		<View style={[styles.themeGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>{modes.map(({ value, label, icon: Icon }) => { const active = value === mode; return <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected: active }} onPress={() => setMode(value)} style={[styles.themeChoice, active && { backgroundColor: colors.accent }]}><Icon size={17} color={active ? colors.onAccent : colors.muted} /><Text style={[styles.themeLabel, { color: active ? colors.onAccent : colors.muted }]}>{label}</Text></Pressable> })}</View>
+		<View style={[styles.themeGroup, { backgroundColor: colors.surfaceRaised }]}>{modes.map(({ value, label, icon: Icon }) => { const active = value === mode; return <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected: active }} onPress={() => setMode(value)} style={[styles.themeChoice, active && { backgroundColor: colors.accent }]}><Icon size={17} color={active ? colors.onAccent : colors.muted} /><Text style={[styles.themeLabel, { color: active ? colors.onAccent : colors.muted }]}>{label}</Text></Pressable> })}</View>
 		<View style={styles.logoutBlock}><ActionButton label={logoutBusy ? 'Выходим…' : 'Выйти из аккаунта'} icon={LogOut} variant="secondary" disabled={logoutBusy} onPress={confirmLogout} /></View>
 	</Screen>
 }
 
 const styles = StyleSheet.create({
 	identity: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-	avatar: { width: 62, height: 62, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
-	avatarText: { fontSize: 20, fontWeight: '800' },
+	avatar: { width: 64, height: 64, alignItems: 'center', justifyContent: 'center', borderRadius: 32 },
+	avatarText: { fontSize: 20, fontWeight: '600' },
 	identityCopy: { flex: 1, gap: 5 },
-	name: { fontSize: 17, fontWeight: '700' },
+	name: { fontSize: 21, fontWeight: '600' },
 	muted: { fontSize: 13, lineHeight: 18 },
-	infoCard: { gap: 15, borderWidth: 1, borderRadius: 18, padding: 18 },
+	infoCard: { gap: 15, borderRadius: 20, padding: 18 },
 	infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
 	storeCopy: { flex: 1, gap: 3 },
 	infoLabel: { fontSize: 12 },
-	infoValue: { marginTop: 3, fontSize: 15, fontWeight: '600' },
+	infoValue: { marginTop: 3, fontSize: 16, fontWeight: '400' },
 	statusDot: { fontSize: 20, lineHeight: 22 },
 	divider: { height: 1 },
-	themeGroup: { flexDirection: 'row', gap: 5, borderWidth: 1, borderRadius: 16, padding: 5 },
+	themeGroup: { flexDirection: 'row', gap: 5, borderRadius: 18, padding: 5 },
 	themeChoice: { flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 12 },
-	themeLabel: { fontSize: 12, fontWeight: '700' },
+	themeLabel: { fontSize: 12, fontWeight: '600' },
 	logoutBlock: { gap: 9 },
 })

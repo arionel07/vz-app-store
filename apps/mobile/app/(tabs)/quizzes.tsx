@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router'
-import { ClipboardList, Inbox } from 'lucide-react-native'
+import { ChevronRight, ClipboardList, Inbox } from 'lucide-react-native'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { ApiError, listAvailableQuizzes, listMyAttempts } from '../../src/api/client'
@@ -64,10 +64,10 @@ export default function QuizzesScreen() {
 		<ScreenHeader title="Тесты" subtitle="Проверяйте знания о продуктах и сервисе." />
 		{loading ? <View style={styles.loading}><ActivityIndicator color={colors.text} /><Text style={[styles.muted, { color: colors.muted }]}>Загружаем доступные тесты…</Text></View> : error ? <InlineMessage title="Не удалось загрузить тесты" body={error} actionLabel="Повторить" onAction={() => void load()} /> : <>
 			<SectionTitle>Доступные тесты</SectionTitle>
-			{quizzes.length === 0 ? <EmptyState icon={Inbox} title="Пока нет доступных тестов" body="Опубликованные тесты для назначенных магазинов появятся здесь." /> : <View style={styles.stack}>{quizzes.map((quiz) => { const active = activeAttempts.get(quiz.id); return <Pressable key={quiz.id} accessibilityRole="button" accessibilityLabel={`${active ? 'Продолжить' : 'Начать'} тест ${quiz.title}`} onPress={() => openQuiz(quiz.id)} style={({ pressed }) => [styles.quizCard, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.78 : 1 }]}><View style={[styles.quizIcon, { backgroundColor: colors.accentSoft }]}><ClipboardList color={colors.text} size={21} /></View><View style={styles.quizCopy}><Text style={[styles.quizTitle, { color: colors.text }]}>{quiz.title}</Text>{quiz.description && <Text numberOfLines={3} style={[styles.quizDescription, { color: colors.muted }]}>{quiz.description}</Text>}<Text style={[styles.quizMeta, { color: colors.muted }]}>{quiz.questions.length} {quiz.questions.length === 1 ? 'вопрос' : 'вопроса'} · Проходной балл {quiz.passingScore}%</Text><Text style={[styles.quizAction, { color: colors.text }]}>{active ? 'Продолжить попытку' : 'Начать тест'}</Text></View></Pressable> })}</View>}
+			{quizzes.length === 0 ? <EmptyState icon={Inbox} title="Пока нет доступных тестов" body="Опубликованные тесты для назначенных магазинов появятся здесь." /> : <View style={styles.stack}>{quizzes.map((quiz) => { const active = activeAttempts.get(quiz.id); return <Pressable key={quiz.id} accessibilityRole="button" accessibilityLabel={`${active ? 'Продолжить' : 'Начать'} тест ${quiz.title}`} onPress={() => openQuiz(quiz.id)} style={({ pressed }) => [styles.quizCard, { backgroundColor: colors.surfaceRaised, opacity: pressed ? 0.72 : 1 }]}><View style={[styles.quizIcon, { backgroundColor: colors.accentSoft }]}><ClipboardList color={colors.accent} size={21} /></View><View style={styles.quizCopy}><Text style={[styles.quizTitle, { color: colors.text }]}>{quiz.title}</Text>{quiz.description && <Text numberOfLines={3} style={[styles.quizDescription, { color: colors.muted }]}>{quiz.description}</Text>}<Text style={[styles.quizMeta, { color: colors.muted }]}>{quiz.questions.length} {quiz.questions.length === 1 ? 'вопрос' : 'вопроса'} · Проходной балл {quiz.passingScore}%</Text><Text style={[styles.quizAction, { color: colors.accent }]}>{active ? 'Продолжить попытку' : 'Начать тест'}</Text></View><ChevronRight color={colors.muted} size={20} /></Pressable> })}</View>}
 
 			<SectionTitle>История попыток</SectionTitle>
-			{submittedAttempts.length === 0 ? <EmptyState icon={Inbox} title="История пока пуста" body="Завершённые попытки появятся здесь после отправки ответов." /> : <View style={styles.stack}>{submittedAttempts.map((attempt) => <Pressable key={attempt.id} accessibilityRole="button" onPress={() => openAttempt(attempt)} style={({ pressed }) => [styles.historyRow, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.78 : 1 }]}><View style={styles.historyCopy}><Text style={[styles.historyTitle, { color: colors.text }]}>{attempt.quiz?.title ?? 'Тест'}</Text><Text style={[styles.muted, { color: colors.muted }]}>Попытка · {dateText(attempt.submittedAt ?? attempt.startedAt)} · Ревизия {attempt.revisionNumber}</Text></View><View style={styles.historyResult}><Text style={[styles.score, { color: attempt.passed ? colors.success : colors.danger }]}>{attempt.scorePercent ?? 0}%</Text><Text style={[styles.muted, { color: colors.muted }]}>{attempt.passed ? 'Пройден' : 'Не пройден'}</Text></View></Pressable>)}</View>}
+			{submittedAttempts.length === 0 ? <EmptyState icon={Inbox} title="История пока пуста" body="Завершённые попытки появятся здесь после отправки ответов." /> : <View style={styles.stack}>{submittedAttempts.map((attempt) => <Pressable key={attempt.id} accessibilityRole="button" onPress={() => openAttempt(attempt)} style={({ pressed }) => [styles.historyRow, { backgroundColor: colors.surfaceRaised, opacity: pressed ? 0.72 : 1 }]}><View style={styles.historyCopy}><Text style={[styles.historyTitle, { color: colors.text }]}>{attempt.quiz?.title ?? 'Тест'}</Text><Text style={[styles.muted, { color: colors.muted }]}>Попытка · {dateText(attempt.submittedAt ?? attempt.startedAt)} · Ревизия {attempt.revisionNumber}</Text></View><View style={styles.historyResult}><Text style={[styles.score, { color: attempt.passed ? colors.success : colors.danger }]}>{attempt.scorePercent ?? 0}%</Text><Text style={[styles.muted, { color: colors.muted }]}>{attempt.passed ? 'Пройден' : 'Не пройден'}</Text></View></Pressable>)}</View>}
 		</>}
 	</Screen>
 }
@@ -77,16 +77,16 @@ const styles = StyleSheet.create({
 	stack: { gap: 12 },
 	mute: { fontSize: 14, lineHeight: 20 },
 	muted: { fontSize: 13, lineHeight: 18 },
-	quizCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 13, borderWidth: 1, borderRadius: 18, padding: 17 },
-	quizIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
+	quizCard: { flexDirection: 'row', alignItems: 'center', gap: 13, borderRadius: 20, padding: 16 },
+	quizIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
 	quizCopy: { flex: 1, gap: 6 },
-	quizTitle: { fontSize: 17, fontWeight: '700' },
+	quizTitle: { fontSize: 17, fontWeight: '600' },
 	quizDescription: { fontSize: 14, lineHeight: 20 },
 	quizMeta: { fontSize: 13, lineHeight: 18 },
-	quizAction: { marginTop: 2, fontSize: 14, fontWeight: '700' },
-	historyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 16, padding: 15 },
+	quizAction: { marginTop: 2, fontSize: 14, fontWeight: '600' },
+	historyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, padding: 15 },
 	historyCopy: { flex: 1, gap: 4 },
-	historyTitle: { fontSize: 15, fontWeight: '700' },
+	historyTitle: { fontSize: 15, fontWeight: '600' },
 	historyResult: { alignItems: 'flex-end', gap: 2 },
-	score: { fontSize: 18, fontWeight: '800' },
+	score: { fontSize: 18, fontWeight: '600' },
 })

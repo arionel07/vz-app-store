@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router'
-import { ArrowRight, Camera, ClipboardCheck, UserRound } from 'lucide-react-native'
+import { Camera, ClipboardCheck, ShieldCheck, UserRound } from 'lucide-react-native'
 import { useMemo } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { ActionButton, Card, IconAction, Screen, SectionTitle } from '../../src/components/ui'
+import { StyleSheet, Text, View } from 'react-native'
 import { useAuth } from '../../src/auth/auth-context'
+import { ActionButton, IconAction, Screen, SectionTitle } from '../../src/components/ui'
 import { useAppTheme } from '../../src/theme'
 
 function greeting(): string {
@@ -18,27 +18,28 @@ export default function HomeScreen() {
 	const { colors } = useAppTheme()
 	const { user } = useAuth()
 	const greetingText = useMemo(greeting, [])
-	return <Screen>
-		<View style={styles.headerRow}><View><Text style={[styles.kicker, { color: colors.muted }]}>VIZAJE STAFF</Text><Text style={[styles.title, { color: colors.text }]}>{greetingText}, {user?.firstName ?? 'коллега'}</Text><Text style={[styles.subtitle, { color: colors.muted }]}>Ваш рабочий день начинается здесь.</Text></View><IconAction icon={UserRound} label="Открыть профиль" onPress={() => router.push('/profile')} /></View>
+	const storeCount = user?.assignedStores.length ?? 0
 
-		<Card style={styles.welcomeCard}><View style={[styles.welcomeMark, { backgroundColor: colors.accentSoft }]}><ClipboardCheck color={colors.text} size={25} /></View><View style={styles.cardCopy}><Text style={[styles.cardTitle, { color: colors.text }]}>Быстрый доступ</Text><Text style={[styles.cardBody, { color: colors.muted }]}>Переходите к тестам или подготовьте фото для рабочего отчёта.</Text></View></Card>
+	return <Screen>
+		<View style={styles.headerRow}><View style={styles.headerCopy}><Text style={[styles.kicker, { color: colors.muted }]}>VIZAJE STAFF</Text><Text style={[styles.title, { color: colors.text }]}>{greetingText}, {user?.firstName ?? 'коллега'}</Text><Text style={[styles.subtitle, { color: colors.muted }]}>Всё нужное для рабочего дня — в одном месте.</Text></View><IconAction icon={UserRound} label="Открыть профиль" onPress={() => router.push('/profile')} /></View>
+
 		<View style={styles.actions}><ActionButton label="Открыть тесты" icon={ClipboardCheck} onPress={() => router.push('/(tabs)/quizzes')} /><ActionButton label="Добавить фото" icon={Camera} variant="secondary" onPress={() => router.push('/(tabs)/photos')} /></View>
-		<SectionTitle>Следующий шаг</SectionTitle>
-		<Pressable style={({ pressed }) => [styles.activationCard, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.75 : 1 }]}><View style={styles.activationCopy}><Text style={[styles.cardTitle, { color: colors.text }]}>Сессия защищена</Text><Text style={[styles.cardBody, { color: colors.muted }]}>Доступ к рабочим данным открыт только для вашей активной учётной записи.</Text></View><ArrowRight color={colors.muted} size={20} /></Pressable>
+
+		<SectionTitle>Сегодня</SectionTitle>
+		<View style={[styles.statusRow, { backgroundColor: colors.surfaceRaised }]}><View style={[styles.statusIcon, { backgroundColor: colors.accentSoft }]}><ShieldCheck color={colors.accent} size={21} /></View><View style={styles.statusCopy}><Text style={[styles.statusTitle, { color: colors.text }]}>Сессия активна</Text><Text style={[styles.statusBody, { color: colors.muted }]}>{storeCount ? `${storeCount} ${storeCount === 1 ? 'магазин доступен' : 'магазина доступны'} для работы.` : 'Назначенные магазины появятся после настройки профиля.'}</Text></View></View>
 	</Screen>
 }
 
 const styles = StyleSheet.create({
 	headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
-	kicker: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
-	title: { marginTop: 7, fontSize: 28, fontWeight: '700', letterSpacing: -0.7 },
-	subtitle: { marginTop: 6, fontSize: 15, lineHeight: 21 },
-	welcomeCard: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-	welcomeMark: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
-	cardCopy: { flex: 1, gap: 5 },
-	cardTitle: { fontSize: 16, fontWeight: '700' },
-	cardBody: { fontSize: 14, lineHeight: 20 },
-	actions: { gap: 11 },
-	activationCard: { minHeight: 92, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14, borderWidth: 1, borderRadius: 18, padding: 18 },
-	activationCopy: { flex: 1, gap: 5 },
+	headerCopy: { flex: 1, gap: 7 },
+	kicker: { fontSize: 11, fontWeight: '600', letterSpacing: 1.4 },
+	title: { fontSize: 30, fontWeight: '600', letterSpacing: -0.8 },
+	subtitle: { fontSize: 16, lineHeight: 23 },
+	actions: { gap: 12, paddingTop: 8 },
+	statusRow: { flexDirection: 'row', alignItems: 'center', gap: 13, borderRadius: 20, padding: 16 },
+	statusIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
+	statusCopy: { flex: 1, gap: 4 },
+	statusTitle: { fontSize: 16, fontWeight: '600' },
+	statusBody: { fontSize: 14, lineHeight: 20 },
 })

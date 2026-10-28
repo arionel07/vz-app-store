@@ -208,7 +208,7 @@ export default function PhotosScreen() {
 	const storeName = useCallback((storeId: string) => stores.find((store) => store.id === storeId)?.name ?? 'Магазин', [stores])
 
 	return <Screen refreshing={historyRefreshing} onRefresh={refreshHistory}>
-		<ScreenHeader title="Фото" subtitle="Загрузите рабочие фотографии в назначенный магазин." />
+		<ScreenHeader title="Фото" subtitle="Рабочие фотографии и история загрузок." />
 
 		{stores.length > 1 && <Card style={styles.storeCard}>
 			<View style={styles.storeHeading}><Store size={19} color={colors.text} /><Text style={[styles.cardTitle, { color: colors.text }]}>Магазин для загрузки</Text></View>
@@ -251,11 +251,11 @@ function StoreOption({ store, selected, onPress }: { store: StoreResponse; selec
 
 function QueueCard({ item, colors, onRemove, onRetry, retryDisabled }: { item: UploadQueueItem; colors: ReturnType<typeof useAppTheme>['colors']; onRemove: () => void; onRetry: () => void; retryDisabled: boolean }) {
 	const status = item.status === 'uploaded' ? 'Загружено' : item.status === 'uploading' ? 'Загрузка…' : item.status === 'failed' ? 'Ошибка' : 'Готово'
-	return <View style={[styles.queueCard, { borderColor: colors.border, backgroundColor: colors.surface }]}><View style={styles.previewWrap}><Image source={item.uri} contentFit="cover" style={styles.preview} /><Pressable accessibilityLabel="Удалить фото" hitSlop={8} onPress={onRemove} disabled={item.status === 'uploading'} style={[styles.removeButton, { backgroundColor: colors.surface }]}><X size={15} color={colors.text} /></Pressable></View><Text numberOfLines={1} style={[styles.fileName, { color: colors.text }]}>{item.filename}</Text><View style={styles.statusRow}>{item.status === 'uploading' ? <ActivityIndicator size="small" color={colors.muted} /> : item.status === 'uploaded' ? <Check size={15} color={colors.success} /> : item.status === 'failed' ? <CircleAlert size={15} color={colors.danger} /> : null}<Text style={[styles.statusText, { color: item.status === 'failed' ? colors.danger : item.status === 'uploaded' ? colors.success : colors.muted }]}>{status}</Text></View>{item.status === 'failed' && <Pressable onPress={onRetry} disabled={retryDisabled} accessibilityRole="button" style={{ opacity: retryDisabled ? 0.45 : 1 }}><Text style={[styles.retryText, { color: colors.text }]}>Повторить</Text></Pressable>}</View>
+	return <View style={[styles.queueCard, { backgroundColor: colors.surfaceRaised }]}><View style={styles.previewWrap}><Image source={item.uri} contentFit="cover" style={styles.preview} /><Pressable accessibilityLabel="Удалить фото" hitSlop={8} onPress={onRemove} disabled={item.status === 'uploading'} style={[styles.removeButton, { backgroundColor: colors.surface }]}><X size={15} color={colors.text} /></Pressable></View><Text numberOfLines={1} style={[styles.fileName, { color: colors.text }]}>{item.filename}</Text><View style={styles.statusRow}>{item.status === 'uploading' ? <ActivityIndicator size="small" color={colors.muted} /> : item.status === 'uploaded' ? <Check size={15} color={colors.success} /> : item.status === 'failed' ? <CircleAlert size={15} color={colors.danger} /> : null}<Text style={[styles.statusText, { color: item.status === 'failed' ? colors.danger : item.status === 'uploaded' ? colors.success : colors.muted }]}>{status}</Text></View>{item.status === 'failed' && <Pressable onPress={onRetry} disabled={retryDisabled} accessibilityRole="button" style={{ opacity: retryDisabled ? 0.45 : 1 }}><Text style={[styles.retryText, { color: colors.accent }]}>Повторить</Text></Pressable>}</View>
 }
 
 function HistoryCard({ photo, storeName, uri, colors }: { photo: PhotoResponse; storeName: string; uri?: string; colors: ReturnType<typeof useAppTheme>['colors'] }) {
-	return <View style={[styles.historyCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>{uri ? <Image source={uri} contentFit="cover" style={styles.historyImage} /> : <View style={[styles.historyPlaceholder, { backgroundColor: colors.surfaceRaised }]}><LoaderCircle size={22} color={colors.muted} /></View>}<Text numberOfLines={1} style={[styles.historyStore, { color: colors.text }]}>{storeName}</Text><Text style={[styles.historyDate, { color: colors.muted }]}>{dateLabel(photo.createdAt)}</Text></View>
+	return <View style={[styles.historyCard, { backgroundColor: colors.surfaceRaised }]}>{uri ? <Image source={uri} contentFit="cover" style={styles.historyImage} /> : <View style={[styles.historyPlaceholder, { backgroundColor: colors.surface }]}><LoaderCircle size={22} color={colors.muted} /></View>}<Text numberOfLines={1} style={[styles.historyStore, { color: colors.text }]}>{storeName}</Text><Text style={[styles.historyDate, { color: colors.muted }]}>{dateLabel(photo.createdAt)}</Text></View>
 }
 
 const styles = StyleSheet.create({
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
 	counter: { fontSize: 13, fontWeight: '600' },
 	warningText: { fontSize: 13, lineHeight: 18 },
 	queueGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-	queueCard: { width: '31.8%', minWidth: 96, gap: 5, borderWidth: 1, borderRadius: 14, padding: 7 },
+	queueCard: { width: '31.8%', minWidth: 96, gap: 5, borderRadius: 16, padding: 7 },
 	previewWrap: { position: 'relative' },
 	preview: { width: '100%', aspectRatio: 1, borderRadius: 9 },
 	removeButton: { position: 'absolute', top: 4, right: 4, width: 25, height: 25, alignItems: 'center', justifyContent: 'center', borderRadius: 13 },
@@ -283,10 +283,10 @@ const styles = StyleSheet.create({
 	statusText: { fontSize: 11 },
 	retryText: { fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
 	historyGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-	historyCard: { width: '48%', borderWidth: 1, borderRadius: 14, padding: 7 },
+	historyCard: { width: '48%', borderRadius: 16, padding: 7 },
 	historyImage: { width: '100%', aspectRatio: 1, borderRadius: 9 },
 	historyPlaceholder: { width: '100%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
-	historyStore: { marginTop: 8, fontSize: 13, fontWeight: '700' },
+	historyStore: { marginTop: 8, fontSize: 13, fontWeight: '600' },
 	historyDate: { marginTop: 3, fontSize: 12 },
 	bottomNote: { gap: 6, borderTopWidth: 1, paddingTop: 16 },
 	bottomNoteText: { fontSize: 13, lineHeight: 18 },

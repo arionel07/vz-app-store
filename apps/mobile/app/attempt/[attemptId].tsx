@@ -67,7 +67,7 @@ export default function AttemptResultScreen() {
 
 	return <Screen>
 		<ScreenHeader title={isSubmitted ? 'Результат' : 'Незавершённый тест'} subtitle={quiz?.title ?? 'Тест'} back backFallback="/(tabs)/quizzes" />
-		{isSubmitted ? <Card style={styles.resultCard}><View style={[styles.resultIcon, { backgroundColor: passed ? colors.accentSoft : colors.surfaceRaised }]}>{passed ? <CheckCircle2 color={colors.success} size={34} /> : <XCircle color={colors.danger} size={34} />}</View><Text style={[styles.resultTitle, { color: colors.text }]}>{passed ? 'Тест пройден' : 'Тест не пройден'}</Text><Text style={[styles.score, { color: passed ? colors.success : colors.danger }]}>{attempt.scorePercent ?? 0}%</Text><Text style={[styles.resultBody, { color: colors.muted }]}>{quiz ? `Проходной балл: ${quiz.passingScore}%` : 'Порог прохождения недоступен.'}</Text><View style={styles.details}><Text style={[styles.detail, { color: colors.muted }]}>Ревизия {attempt.revisionNumber}</Text><Text style={[styles.detail, { color: colors.muted }]}>{dateText(attempt.submittedAt ?? attempt.startedAt)}</Text></View></Card> : <InlineMessage title="Попытка не завершена" body="Вы можете продолжить отвечать на вопросы с сохранённого места." actionLabel="Продолжить" onAction={() => router.replace({ pathname: '/quiz/[id]/attempt', params: { id: attempt.quizId, attemptId: attempt.id } })} />}
+		{isSubmitted ? <Card style={styles.resultCard}><View style={[styles.resultIcon, { backgroundColor: passed ? colors.accentSoft : colors.surfaceRaised }]}>{passed ? <CheckCircle2 color={colors.success} size={34} /> : <XCircle color={colors.danger} size={34} />}</View><Text style={[styles.resultTitle, { color: colors.text }]}>{passed ? 'Тест пройден' : 'Тест не пройден'}</Text><Text style={[styles.score, { color: passed ? colors.success : colors.danger }]}>{attempt.scorePercent ?? 0}%</Text><Text style={[styles.resultBody, { color: colors.muted }]}>{quiz ? `Проходной балл: ${quiz.passingScore}%` : 'Порог прохождения недоступен.'}</Text><View style={[styles.details, { borderTopColor: colors.border }]}><Text style={[styles.detail, { color: colors.muted }]}>Ревизия {attempt.revisionNumber}</Text><Text style={[styles.detail, { color: colors.muted }]}>{dateText(attempt.submittedAt ?? attempt.startedAt)}</Text></View></Card> : <InlineMessage title="Попытка не завершена" body="Вы можете продолжить отвечать на вопросы с сохранённого места." actionLabel="Продолжить" onAction={() => router.replace({ pathname: '/quiz/[id]/attempt', params: { id: attempt.quizId, attemptId: attempt.id } })} />}
 		{error && <InlineMessage title="Не удалось начать новую попытку" body={error} actionLabel="Повторить" onAction={() => void retry()} />}
 		{isSubmitted && <ActionButton label={retrying ? 'Готовим новую попытку…' : 'Пройти ещё раз'} icon={RotateCcw} disabled={retrying} variant="secondary" onPress={() => void retry()} />}
 		<ActionButton label="Вернуться к тестам" variant={isSubmitted ? 'quiet' : 'secondary'} onPress={() => router.replace('/(tabs)/quizzes')} />
@@ -78,9 +78,9 @@ const styles = StyleSheet.create({
 	loading: { minHeight: 180, alignItems: 'center', justifyContent: 'center' },
 	resultCard: { alignItems: 'center', gap: 9 },
 	resultIcon: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center', borderRadius: 24, marginBottom: 4 },
-	resultTitle: { fontSize: 23, fontWeight: '800', textAlign: 'center' },
-	score: { marginTop: 4, fontSize: 44, fontWeight: '800' },
+	resultTitle: { fontSize: 26, fontWeight: '600', textAlign: 'center' },
+	score: { marginTop: 4, fontSize: 44, fontWeight: '600' },
 	resultBody: { fontSize: 15, lineHeight: 21, textAlign: 'center' },
-	details: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 14, paddingTop: 15, borderTopWidth: 1, borderTopColor: 'rgba(128,128,128,0.18)' },
+	details: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 14, paddingTop: 15, borderTopWidth: StyleSheet.hairlineWidth },
 	detail: { fontSize: 13 },
 })

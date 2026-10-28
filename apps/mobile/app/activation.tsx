@@ -1,14 +1,15 @@
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera'
 import { useURL } from 'expo-linking'
-import { Camera, Eye, EyeOff, LogIn, QrCode, ShieldCheck } from 'lucide-react-native'
+import { Camera, ChevronLeft, Eye, EyeOff, LogIn, Mail, QrCode } from 'lucide-react-native'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ApiError, isNetworkError } from '../src/api/client'
 import { createActivationLinkGate, parseActivationPayload, type ActivationPayload } from '../src/auth/activation-payload'
 import { useAuth } from '../src/auth/auth-context'
 import { mobileLoginErrorMessage } from '../src/auth/login-errors'
-import { ActionButton, Card, Screen, ScreenHeader } from '../src/components/ui'
-import { useAppTheme } from '../src/theme'
+import { ActionButton, Card, Screen } from '../src/components/ui'
+import { useAppTheme, type ThemeColors } from '../src/theme'
 
 function activationError(error: unknown): string {
 	if (error instanceof ApiError) {
@@ -26,6 +27,7 @@ export default function ActivationScreen() {
 	const [scanning, setScanning] = useState(false)
 	const [busy, setBusy] = useState(false)
 	const [message, setMessage] = useState<string | null>(null)
+	const [showLogin, setShowLogin] = useState(false)
 	const [loginEmail, setLoginEmail] = useState('')
 	const [loginPassword, setLoginPassword] = useState('')
 	const [showPassword, setShowPassword] = useState(false)
@@ -66,6 +68,7 @@ export default function ActivationScreen() {
 			return
 		}
 		if (!linkGate.current(payload)) return
+		setShowLogin(false)
 		setMessage(null)
 		setPendingLink(payload)
 	}, [activationLinkBaseUrl, url])
@@ -83,17 +86,18 @@ export default function ActivationScreen() {
 	}
 
 	const submitLogin = async () => {
-		if (busyRef.current) return
+		if (busyRef.current || loginSubmitting) return
 		setMessage(null)
 		setLoginMessage(null)
-		if (!loginEmail.trim() || !loginPassword) {
-			setLoginMessage('Введите email и пароль.')
+		const email = loginEmail.trim()
+		if (!/^\S+@\S+\.\S+$/.test(email) || !loginPassword) {
+			setLoginMessage('Введите корректный email и пароль.')
 			return
 		}
 		busyRef.current = true
 		setBusy(true)
 		try {
-			await loginMobile(loginEmail.trim(), loginPassword)
+			await loginMobile(email, loginPassword)
 		} catch (error) {
 			setLoginMessage(mobileLoginErrorMessage(error))
 		} finally {
@@ -127,43 +131,60 @@ export default function ActivationScreen() {
 		void redeemPayload(payload)
 	}
 
-	return <Screen>
-		<ScreenHeader title="Активация" subtitle="Подключите мобильное приложение к профилю." />
-		<View style={styles.hero}><View style={[styles.qrMark, { backgroundColor: colors.accentSoft }]}><QrCode color={colors.text} size={42} strokeWidth={1.7} /></View><Text style={[styles.heroTitle, { color: colors.text }]}>Сканирование QR-кода</Text><Text style={[styles.heroBody, { color: colors.muted }]}>Попросите менеджера создать одноразовый код активации и наведите камеру на QR-код.</Text></View>
-		{pendingLink && <Card style={styles.linkConfirmation}><Text style={[styles.confirmationTitle, { color: colors.text }]}>Подтвердите активацию</Text><Text style={[styles.confirmationBody, { color: colors.muted }]}>Ссылка активирует рабочий аккаунт на этом устройстве. Она одноразовая и действует ограниченное время.</Text><ActionButton label="Активировать приложение" onPress={confirmLinkActivation} /><ActionButton label="Отмена" variant="secondary" onPress={cancelLinkActivation} /></Card>}
-		{!pendingLink && scanning && <View style={styles.cameraShell}><CameraView style={styles.camera} facing="back" barcodeScannerSettings={{ barcodeTypes: ['qr'] }} onBarcodeScanned={scanLocked.current ? undefined : onBarcodeScanned}><View style={styles.scanOverlay}><View style={[styles.scanFrame, { borderColor: colors.onAccent }]} /><Text style={styles.scanHint}>Наведите камеру на QR-код</Text></View></CameraView><ActionButton label="Закрыть камеру" variant="secondary" onPress={() => setScanning(false)} /></View>}
-		<Card><View style={styles.infoRow}><ShieldCheck color={colors.success} size={21} /><Text style={[styles.infoText, { color: colors.text }]}>Код используется один раз и не сохраняется в приложении.</Text></View></Card>
-		{!scanning && !pendingLink && <Card style={styles.loginCard}><Text style={[styles.loginTitle, { color: colors.text }]}>Войти по электронной почте и паролю</Text><Text style={[styles.loginBody, { color: colors.muted }]}>Используйте личные данные, выданные менеджером.</Text><TextInput style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceRaised }]} value={loginEmail} onChangeText={setLoginEmail} placeholder="Электронная почта" placeholderTextColor={colors.muted} autoCapitalize="none" autoCorrect={false} autoComplete="email" keyboardType="email-address" textContentType="emailAddress" editable={!busy && !loginSubmitting} returnKeyType="next" /><View style={[styles.passwordField, { borderColor: colors.border, backgroundColor: colors.surfaceRaised }]}><TextInput style={[styles.passwordInput, { color: colors.text }]} value={loginPassword} onChangeText={setLoginPassword} placeholder="Пароль" placeholderTextColor={colors.muted} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="current-password" textContentType="password" editable={!busy && !loginSubmitting} returnKeyType="done" onSubmitEditing={() => void submitLogin()} /><Pressable accessibilityRole="button" accessibilityLabel={showPassword ? 'Скрыть пароль' : 'Показать пароль'} onPress={() => setShowPassword((value) => !value)} hitSlop={8} disabled={busy || loginSubmitting}><>{showPassword ? <EyeOff color={colors.muted} size={20} /> : <Eye color={colors.muted} size={20} />}</></Pressable></View>{loginMessage && <Text accessibilityRole="alert" style={[styles.loginError, { color: colors.danger }]}>{loginMessage}</Text>}<ActionButton label={busy || loginSubmitting ? 'Выполняем вход…' : 'Войти'} icon={LogIn} disabled={busy || loginSubmitting} onPress={() => void submitLogin()} /></Card>}
-		{message && <View accessibilityRole="alert" style={[styles.message, { backgroundColor: colors.accentSoft }]}><Text style={[styles.messageText, { color: colors.text }]}>{message}</Text>{message.includes('настройках') && <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()}><Text style={[styles.settingsLink, { color: colors.text }]}>Открыть настройки</Text></Pressable>}</View>}
-		{busy ? <View style={styles.busy}><ActivityIndicator color={colors.text} /><Text style={[styles.busyText, { color: colors.muted }]}>Проверяем код активации…</Text></View> : !scanning && !pendingLink && <ActionButton label="Сканировать QR-код" icon={Camera} onPress={() => void startScanning()} />}
+	if (scanning) return <ScannerView colors={colors} onClose={() => setScanning(false)} onBarcodeScanned={scanLocked.current ? undefined : onBarcodeScanned} />
+
+	return <Screen keyboardAware={showLogin} contentStyle={styles.content}>
+		<View style={styles.brandBlock}><Text style={[styles.brand, { color: colors.muted }]}>VIZAJE STAFF</Text><Text style={[styles.title, { color: colors.text }]}>{showLogin ? 'Вход' : 'Добро пожаловать'}</Text><Text style={[styles.subtitle, { color: colors.muted }]}>{showLogin ? 'Войдите, чтобы продолжить работу.' : 'Подключите приложение к рабочему аккаунту.'}</Text></View>
+
+		{pendingLink && <Card style={styles.linkConfirmation}><Text style={[styles.confirmationTitle, { color: colors.text }]}>Подтвердите активацию</Text><Text style={[styles.confirmationBody, { color: colors.muted }]}>Ссылка активирует рабочий аккаунт на этом устройстве. Она одноразовая и действует ограниченное время.</Text><ActionButton label="Активировать приложение" onPress={confirmLinkActivation} disabled={busy} /><ActionButton label="Отмена" variant="quiet" onPress={cancelLinkActivation} disabled={busy} /></Card>}
+
+		{!pendingLink && !showLogin && <View style={styles.activationPanel}><View style={[styles.qrMark, { backgroundColor: colors.accentSoft }]}><QrCode color={colors.accent} size={42} strokeWidth={1.7} /></View><Text style={[styles.panelTitle, { color: colors.text }]}>Подключение по QR</Text><Text style={[styles.panelBody, { color: colors.muted }]}>Отсканируйте одноразовый код, который создал менеджер.</Text><ActionButton label="Сканировать QR" icon={Camera} onPress={() => void startScanning()} disabled={busy} /><ActionButton label="Войти по email" icon={Mail} variant="secondary" onPress={() => { setShowLogin(true); setLoginMessage(null) }} disabled={busy} /></View>}
+
+		{!pendingLink && showLogin && <View style={styles.loginPanel}><Text style={[styles.panelTitle, { color: colors.text }]}>Вход по email</Text><Text style={[styles.panelBody, { color: colors.muted }]}>Используйте личные данные, выданные менеджером.</Text><View style={styles.fieldGroup}><Text style={[styles.fieldLabel, { color: colors.text }]}>Электронная почта</Text><TextInput accessibilityLabel="Электронная почта" style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceRaised }]} value={loginEmail} onChangeText={setLoginEmail} placeholder="name@example.com" placeholderTextColor={colors.muted} autoCapitalize="none" autoCorrect={false} autoComplete="email" keyboardType="email-address" textContentType="emailAddress" editable={!busy && !loginSubmitting} returnKeyType="next" /></View><View style={styles.fieldGroup}><Text style={[styles.fieldLabel, { color: colors.text }]}>Пароль</Text><View style={[styles.passwordField, { borderColor: colors.border, backgroundColor: colors.surfaceRaised }]}><TextInput accessibilityLabel="Пароль" style={[styles.passwordInput, { color: colors.text }]} value={loginPassword} onChangeText={setLoginPassword} placeholder="Введите пароль" placeholderTextColor={colors.muted} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="current-password" textContentType="password" editable={!busy && !loginSubmitting} returnKeyType="done" onSubmitEditing={() => void submitLogin()} /><Pressable accessibilityRole="button" accessibilityLabel={showPassword ? 'Скрыть пароль' : 'Показать пароль'} onPress={() => setShowPassword((value) => !value)} hitSlop={8} disabled={busy || loginSubmitting}>{showPassword ? <EyeOff color={colors.muted} size={20} /> : <Eye color={colors.muted} size={20} />}</Pressable></View></View>{loginMessage && <Text accessibilityRole="alert" style={[styles.loginError, { color: colors.danger }]}>{loginMessage}</Text>}<ActionButton label={busy || loginSubmitting ? 'Выполняем вход…' : 'Войти'} icon={LogIn} disabled={busy || loginSubmitting} onPress={() => void submitLogin()} /><ActionButton label="Вернуться к QR-активации" variant="quiet" onPress={() => { setShowLogin(false); setLoginMessage(null) }} disabled={busy || loginSubmitting} /></View>}
+
+		{message && <View accessibilityRole="alert" style={[styles.message, { backgroundColor: colors.surfaceRaised }]}><Text style={[styles.messageText, { color: colors.text }]}>{message}</Text>{message.includes('настройках') && <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()}><Text style={[styles.settingsLink, { color: colors.accent }]}>Открыть настройки</Text></Pressable>}</View>}
+		{busy && !loginSubmitting && <View style={styles.busy}><ActivityIndicator color={colors.accent} /><Text style={[styles.busyText, { color: colors.muted }]}>Проверяем код активации…</Text></View>}
 	</Screen>
 }
 
+function ScannerView({ colors, onClose, onBarcodeScanned }: { colors: ThemeColors; onClose: () => void; onBarcodeScanned?: (result: BarcodeScanningResult) => void }) {
+	const insets = useSafeAreaInsets()
+	return <View style={styles.scanner}><CameraView style={StyleSheet.absoluteFill} facing="back" barcodeScannerSettings={{ barcodeTypes: ['qr'] }} onBarcodeScanned={onBarcodeScanned}><View style={styles.scannerOverlay} pointerEvents="box-none"><View style={[styles.scannerTop, { paddingTop: insets.top + 12 }]}><Pressable accessibilityRole="button" accessibilityLabel="Закрыть сканер" onPress={onClose} style={[styles.scannerControl, { backgroundColor: colors.surface }]}><ChevronLeft color={colors.text} size={24} /></Pressable><Text style={[styles.scannerBrand, { color: colors.onAccent }]}>VIZAJE STAFF</Text><View style={styles.scannerControlPlaceholder} /></View><View style={styles.scanCenter}><View style={[styles.scanFrame, { borderColor: colors.accent }]} /></View><View style={[styles.scannerBottom, { paddingBottom: insets.bottom + 20 }]}><Text style={styles.scannerHint}>Наведите камеру на QR-код</Text></View></View></CameraView></View>
+}
+
 const styles = StyleSheet.create({
-	hero: { alignItems: 'center', gap: 12, paddingTop: 18 },
-	qrMark: { width: 104, height: 104, alignItems: 'center', justifyContent: 'center', borderRadius: 30 },
-	heroTitle: { marginTop: 4, fontSize: 21, fontWeight: '800', textAlign: 'center' },
-	heroBody: { maxWidth: 330, fontSize: 15, lineHeight: 22, textAlign: 'center' },
-	infoRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-	infoText: { flex: 1, fontSize: 14, lineHeight: 20 },
-	cameraShell: { gap: 11 },
-	camera: { height: 340, overflow: 'hidden', borderRadius: 20 },
-	scanOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 22, backgroundColor: 'rgba(0,0,0,0.18)' },
-	scanFrame: { width: 220, height: 220, borderWidth: 3, borderRadius: 20 },
-	scanHint: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-	message: { gap: 8, borderRadius: 14, padding: 14 },
-	messageText: { fontSize: 14, lineHeight: 20 },
-	settingsLink: { fontSize: 14, fontWeight: '700' },
-	busy: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-	busyText: { fontSize: 15 },
-	linkConfirmation: { gap: 14 },
-	confirmationTitle: { fontSize: 18, fontWeight: '800' },
-	confirmationBody: { fontSize: 15, lineHeight: 22 },
-	loginCard: { gap: 12 },
-	loginTitle: { fontSize: 18, fontWeight: '800' },
-	loginBody: { fontSize: 14, lineHeight: 20 },
-	input: { minHeight: 52, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, fontSize: 16 },
-	passwordField: { minHeight: 52, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 14, paddingLeft: 14, paddingRight: 15 },
+	content: { gap: 28 },
+	brandBlock: { gap: 8, paddingTop: 8 },
+	brand: { fontSize: 11, fontWeight: '600', letterSpacing: 1.4 },
+	title: { fontSize: 32, fontWeight: '600', letterSpacing: -0.9 },
+	subtitle: { fontSize: 16, lineHeight: 23 },
+	activationPanel: { alignItems: 'center', gap: 14, paddingTop: 22 },
+	qrMark: { width: 96, height: 96, alignItems: 'center', justifyContent: 'center', borderRadius: 28, marginBottom: 4 },
+	panelTitle: { fontSize: 21, fontWeight: '600', textAlign: 'center' },
+	panelBody: { maxWidth: 320, fontSize: 16, lineHeight: 23, textAlign: 'center', marginBottom: 8 },
+	loginPanel: { gap: 16 },
+	fieldGroup: { gap: 8 },
+	fieldLabel: { fontSize: 14, fontWeight: '600' },
+	input: { minHeight: 52, borderWidth: 1, borderRadius: 16, paddingHorizontal: 15, fontSize: 16 },
+	passwordField: { minHeight: 52, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 16, paddingLeft: 15, paddingRight: 15 },
 	passwordInput: { flex: 1, minHeight: 50, paddingVertical: 0, paddingRight: 10, fontSize: 16 },
 	loginError: { fontSize: 14, lineHeight: 20 },
+	message: { gap: 8, borderRadius: 16, padding: 14 },
+	messageText: { fontSize: 14, lineHeight: 20 },
+	settingsLink: { fontSize: 14, fontWeight: '600' },
+	linkConfirmation: { gap: 14 },
+	confirmationTitle: { fontSize: 18, fontWeight: '600' },
+	confirmationBody: { fontSize: 15, lineHeight: 22 },
+	busy: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+	busyText: { fontSize: 15 },
+	scanner: { flex: 1, backgroundColor: '#000000' },
+	scannerOverlay: { flex: 1, justifyContent: 'space-between' },
+	scannerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
+	scannerControl: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
+	scannerControlPlaceholder: { width: 44, height: 44 },
+	scannerBrand: { fontSize: 11, fontWeight: '600', letterSpacing: 1.4 },
+	scanCenter: { alignItems: 'center', justifyContent: 'center' },
+	scanFrame: { width: 238, height: 238, borderWidth: 3, borderRadius: 28 },
+	scannerBottom: { alignItems: 'center', paddingHorizontal: 20 },
+	scannerHint: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 })
