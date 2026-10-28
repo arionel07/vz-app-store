@@ -1,6 +1,6 @@
 import { AdminShell } from '@/components/admin-shell'
-import { OverviewPage } from '@/components/overview-page'
+import { DashboardPage } from '@/components/dashboard-page'
 
 export default function HomePage() {
-	return <AdminShell><OverviewPage /></AdminShell>
+	return <AdminShell><DashboardPage /></AdminShell>
 }

@@ -1,7 +1,7 @@
 import type { Context, Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
-import { photoCollectionQuerySchema, photoIdempotencyKeySchema } from "@vizaje/contracts";
+import { photoCollectionQuerySchema, photoIdempotencyKeySchema, photoStoreCollectionQuerySchema } from "@vizaje/contracts";
 import type { TrustedPrincipal } from "../domain/authz";
 import { DomainError } from "../domain/errors";
 import type { PhotosService } from "../domain/photos/service";
@@ -67,7 +67,7 @@ export function registerPhotoRoutes(app: Hono, options: PhotoRoutesOptions): voi
 
   app.get("/api/v1/stores/:storeId/photos", async (context) => {
     const principal = await requirePrincipal(resolvePrincipal, context);
-    const query = parseInput(photoCollectionQuerySchema.omit({ storeId: true }), context.req.query());
+    const query = parseInput(photoStoreCollectionQuerySchema, context.req.query());
     return context.json(await photos.listByStore(principal, idParam(context, "storeId"), query), 200);
   });
 

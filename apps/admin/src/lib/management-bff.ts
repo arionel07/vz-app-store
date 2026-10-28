@@ -53,6 +53,19 @@ export async function proxyManagement<T>(
 	}
 }
 
+export async function proxyManagementNoContent(request: Request, path: string, options: { method: BffFetchOptions['method']; body?: string }): Promise<NextResponse> {
+	try {
+		const upstream = await fetchManagementApi(path, getManagementRequestOptions(request, { ...options, method: options.method ?? 'GET' }))
+		if (upstream.ok) return new NextResponse(null, { status: upstream.status, headers: { 'Cache-Control': 'private, no-store, max-age=0', Pragma: 'no-cache', Vary: 'Cookie' } })
+		return forwardBffResponse(upstream, { safeParse: (value: unknown) => value === null ? { success: true, data: null } : { success: false } }, {
+			fallbackErrorCode: 'MANAGEMENT_REQUEST_FAILED',
+			fallbackErrorMessage: 'Запрос управления не выполнен',
+		})
+	} catch {
+		return managementUnavailableResponse()
+	}
+}
+
 export function isNextResponse(value: unknown): value is NextResponse {
 	return value instanceof NextResponse
 }

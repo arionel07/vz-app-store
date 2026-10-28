@@ -328,6 +328,19 @@ suite("Photo uploads PostgreSQL integration", () => {
     expect(adminAll.status).toBe(200);
     expect((await json(adminAll)).data).toHaveLength(1);
 
+    const photoPeriodStart = new Date(Date.now() - 60_000).toISOString();
+    const photoPeriodEnd = new Date(Date.now() + 60_000).toISOString();
+    const filtered = await app.request(`/api/v1/photos?uploadedBy=${staffAId}&startDate=${encodeURIComponent(photoPeriodStart)}&endDate=${encodeURIComponent(photoPeriodEnd)}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(filtered.status).toBe(200);
+    expect((await json(filtered)).data.map((photo: { id: string }) => photo.id)).toContain(photoId);
+
+    const invalidRange = await app.request(`/api/v1/photos?startDate=${encodeURIComponent(photoPeriodEnd)}&endDate=${encodeURIComponent(photoPeriodStart)}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(invalidRange.status).toBe(400);
+
     const otherStoreList = await app.request(`/api/v1/stores/${storeAId}/photos`, { headers: { Authorization: `Bearer ${staffBToken}` } });
     expect(otherStoreList.status).toBe(403);
 

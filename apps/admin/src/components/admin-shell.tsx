@@ -120,7 +120,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 					{navItems.map(({ label, icon: Icon, value }) => {
 						const path = value === 'overview' ? '/' : `/${value}`
 						const active = value === 'overview' ? isOverview : pathname.startsWith(path)
-						const implemented = value === 'overview' || value === 'employees' || value === 'stores' || value === 'quizzes' || value === 'results'
+						const implemented = value === 'overview' || value === 'employees' || value === 'stores' || value === 'quizzes' || value === 'results' || value === 'photos'
 						return <button key={value} type="button" className={cn('nav-item', active && 'nav-item-active')} onClick={() => {
 							if (implemented) router.push(path)
 							else toast.info(`${label}: раздел будет доступен позже`)

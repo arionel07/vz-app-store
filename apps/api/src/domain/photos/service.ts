@@ -1,10 +1,8 @@
-import { and, desc, eq, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, lt, sql, type SQL } from "drizzle-orm";
 import {
   photoCollectionQuerySchema,
   photoIdempotencyKeySchema,
-  photoListQuerySchema,
   type PhotoCollectionQuery,
-  type PhotoListQuery,
   type PhotoResponse,
 } from "@vizaje/contracts";
 import type { Database } from "../../db/client";
@@ -94,15 +92,21 @@ export class PhotosService {
     if (principal.role !== "staff") throw new DomainError(403, "FORBIDDEN", "Only staff users can upload photos");
   }
 
-  private async listRows(whereClause: SQL | undefined, query: PhotoListQuery) {
+  private async listRows(whereClause: SQL | undefined, query: PhotoCollectionQuery) {
+    const filters: SQL[] = [];
+    if (whereClause) filters.push(whereClause);
+    if (query.uploadedBy) filters.push(eq(photos.uploadedBy, query.uploadedBy));
+    if (query.startDate) filters.push(gte(photos.createdAt, new Date(query.startDate)));
+    if (query.endDate) filters.push(lt(photos.createdAt, new Date(query.endDate)));
+    const combinedWhere = filters.length > 0 ? and(...filters) : undefined;
     const [{ total }] = await this.db
       .select({ total: sql<number>`count(*)` })
       .from(photos)
-      .where(whereClause);
+      .where(combinedWhere);
     const rows = await this.db
       .select()
       .from(photos)
-      .where(whereClause)
+      .where(combinedWhere)
       .orderBy(desc(photos.createdAt))
       .limit(query.pageSize)
       .offset((query.page - 1) * query.pageSize);
@@ -210,10 +214,9 @@ export class PhotosService {
     }
   }
 
-  async listByStore(principal: TrustedPrincipal, storeId: string, query: PhotoListQuery): Promise<ReturnType<PhotosService["listRows"]>> {
+  async listByStore(principal: TrustedPrincipal, storeId: string, query: PhotoCollectionQuery): Promise<ReturnType<PhotosService["listRows"]>> {
     await this.assertStoreReadable(principal, storeId);
-    const data = photoListQuerySchema.parse(query);
-    return this.listRows(eq(photos.storeId, storeId), data);
+    return this.listRows(eq(photos.storeId, storeId), query);
   }
 
   async list(principal: TrustedPrincipal, query: PhotoCollectionQuery) {

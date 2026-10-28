@@ -12,7 +12,15 @@ import {
 import { CSRF_COOKIE_NAME, SESSION_COOKIE_NAME } from './auth-constants'
 
 const AUTH_API_PREFIX = '/api/v1/auth/'
-const MANAGEMENT_API_PREFIXES = ['/api/v1/users', '/api/v1/stores', '/api/v1/management/quizzes']
+const MANAGEMENT_API_PREFIXES = [
+	'/api/v1/users',
+	'/api/v1/stores',
+	'/api/v1/management/quizzes',
+	'/api/v1/photos',
+	'/api/v1/dashboard/overview',
+	'/api/v1/dashboard/photos',
+	'/api/v1/dashboard/quizzes',
+]
 const ACTIVATION_API_PREFIX = '/api/v1/auth/activation'
 const NO_STORE_HEADERS = {
 	'Cache-Control': 'private, no-store, max-age=0',
@@ -223,6 +231,27 @@ export function backendUnavailableResponse(): NextResponse {
 
 export function managementUnavailableResponse(): NextResponse {
 	return jsonError(503, 'MANAGEMENT_BACKEND_UNAVAILABLE', 'Сервис управления временно недоступен')
+}
+
+export async function forwardBffBinaryResponse(upstream: Response): Promise<NextResponse> {
+	if (!upstream.ok) {
+		const payload = await readJson(upstream)
+		const parsedError = errorResponseSchema.safeParse(payload)
+		return NextResponse.json(
+			parsedError.success
+				? parsedError.data
+				: errorResponseSchema.parse({ error: { code: upstream.status === 401 ? 'UNAUTHENTICATED' : 'PHOTO_REQUEST_FAILED', message: 'Не удалось получить фотографию' } }),
+			{ status: upstream.status, headers: NO_STORE_HEADERS },
+		)
+	}
+	if (!upstream.body) return jsonError(502, 'PHOTO_BACKEND_INVALID_RESPONSE', 'Сервис фотографий вернул пустой ответ')
+	const headers = new Headers(NO_STORE_HEADERS)
+	for (const name of ['content-type', 'content-length', 'content-disposition']) {
+		const value = upstream.headers.get(name)
+		if (value) headers.set(name, value)
+	}
+	headers.set('X-Content-Type-Options', 'nosniff')
+	return new NextResponse(upstream.body, { status: upstream.status, headers })
 }
 
 export async function getCurrentUser(cookieHeader: string | null | undefined): Promise<{
