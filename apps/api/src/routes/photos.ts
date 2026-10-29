@@ -1,7 +1,7 @@
 import type { Context, Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
-import { photoCollectionQuerySchema, photoIdempotencyKeySchema, photoStoreCollectionQuerySchema } from "@vizaje/contracts";
+import { photoCollectionQuerySchema, photoIdempotencyKeySchema, photoReviewApproveSchema, photoReviewCollectionQuerySchema, photoReviewRejectSchema, photoReviewMineQuerySchema, photoStoreCollectionQuerySchema } from "@vizaje/contracts";
 import type { TrustedPrincipal } from "../domain/authz";
 import { DomainError } from "../domain/errors";
 import type { PhotosService } from "../domain/photos/service";
@@ -92,5 +92,55 @@ export function registerPhotoRoutes(app: Hono, options: PhotoRoutesOptions): voi
     const principal = await requirePrincipal(resolvePrincipal, context);
     await photos.deletePhoto(principal, idParam(context, "id"));
     return context.body(null, 204);
+  });
+
+  app.get("/api/v1/photo-reports", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    const query = parseInput(photoReviewCollectionQuerySchema, context.req.query());
+    return context.json(await photos.listReports(principal, query), 200);
+  });
+
+  app.get("/api/v1/me/photo-reports", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    const query = parseInput(photoReviewMineQuerySchema, context.req.query());
+    return context.json(await photos.listMyReports(principal, query), 200);
+  });
+
+  app.get("/api/v1/photo-reports/:id", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await photos.getReport(principal, idParam(context, "id")), 200);
+  });
+
+  app.get("/api/v1/photo-reports/:id/history", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await photos.getHistory(principal, idParam(context, "id")), 200);
+  });
+
+  const approve = async (context: Context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    const input = parseInput(photoReviewApproveSchema, await context.req.json().catch(() => ({})));
+    const rawIdempotencyKey = context.req.header("Idempotency-Key");
+    const idempotencyKey = rawIdempotencyKey === undefined ? undefined : parseInput(photoIdempotencyKeySchema, rawIdempotencyKey);
+    const response = await photos.approve(principal, idParam(context, "id"), input.comment, idempotencyKey);
+    return context.json(response, 200);
+  };
+  app.post("/api/v1/photo-reports/:id/check", approve);
+  app.post("/api/v1/photo-reports/:id/approve", approve);
+
+  app.post("/api/v1/photo-reports/:id/reject", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    const input = parseInput(photoReviewRejectSchema, await context.req.json().catch(() => ({})));
+    const rawIdempotencyKey = context.req.header("Idempotency-Key");
+    const idempotencyKey = rawIdempotencyKey === undefined ? undefined : parseInput(photoIdempotencyKeySchema, rawIdempotencyKey);
+    return context.json(await photos.reject(principal, idParam(context, "id"), input.comment, idempotencyKey), 200);
+  });
+
+  app.post("/api/v1/photo-reports/:id/resubmit", uploadLimit, async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    const file = await parsePhotoFile(context);
+    const rawIdempotencyKey = context.req.header("Idempotency-Key");
+    const idempotencyKey = rawIdempotencyKey === undefined ? undefined : parseInput(photoIdempotencyKeySchema, rawIdempotencyKey);
+    const result = await photos.resubmit(principal, idParam(context, "id"), file, idempotencyKey);
+    return context.json(result, result.created ? 201 : 200);
   });
 }

@@ -5,11 +5,16 @@ import { GET as getImage } from '../src/app/api/admin/photos/[id]/image/route'
 import { GET as getOverview } from '../src/app/api/admin/dashboard/overview/route'
 import { GET as getPhotoDashboard } from '../src/app/api/admin/dashboard/photos/route'
 import { GET as getQuizDashboard } from '../src/app/api/admin/dashboard/quizzes/route'
+import { GET as getReports } from '../src/app/api/admin/photo-reports/route'
+import { GET as getReport } from '../src/app/api/admin/photo-reports/[id]/route'
+import { GET as getHistory } from '../src/app/api/admin/photo-reports/[id]/history/route'
+import { POST as checkReport } from '../src/app/api/admin/photo-reports/[id]/check/route'
 
 const originalFetch = globalThis.fetch
 const photoId = '00000000-0000-4000-8000-000000000001'
 const storeId = '00000000-0000-4000-8000-000000000002'
 const userId = '00000000-0000-4000-8000-000000000003'
+const reportId = '00000000-0000-4000-8000-000000000004'
 const period = { start: '2026-01-01T00:00:00.000Z', end: '2026-02-01T00:00:00.000Z' }
 
 function upstream(status: number, payload: unknown): Response {
@@ -19,6 +24,11 @@ function upstream(status: number, payload: unknown): Response {
 
 function request(path: string, init?: RequestInit): Request { return new Request(`http://admin.test${path}`, init) }
 function basePeriod() { return { ...period, endExclusive: true, timezone: 'UTC' as const } }
+function reportPayload() {
+	const photo = { id: photoId, storeId, uploadedBy: userId, originalFilename: 'a.png', mimeType: 'image/png', fileSize: 3, createdAt: '2026-01-15T00:00:00.000Z' }
+	const version = { id: '00000000-0000-4000-8000-000000000005', reportId, photo, versionNumber: 1, status: 'pending', rejectionComment: null, submittedAt: photo.createdAt, reviewedAt: null, reviewedBy: null }
+	return { id: reportId, storeId, submittedBy: userId, currentVersion: version, versionCount: 1, createdAt: photo.createdAt, updatedAt: photo.createdAt, versions: [version] }
+}
 
 afterEach(() => { globalThis.fetch = originalFetch; delete process.env.VIZAJE_API_URL })
 
@@ -39,6 +49,20 @@ describe('media and dashboard BFF', () => {
 		expect(image.status).toBe(200); expect(image.headers.get('cache-control')).toContain('no-store'); expect(image.headers.get('x-content-type-options')).toBe('nosniff'); expect(new Uint8Array(await image.arrayBuffer())).toEqual(Uint8Array.from([1, 2, 3]))
 		const deleted = await deletePhoto(request(`/api/admin/photos/${photoId}`, { method: 'DELETE', headers: { cookie: 'vizaje_session=session', 'x-csrf-token': 'csrf' } }), { params: Promise.resolve({ id: photoId }) })
 		expect(deleted.status).toBe(204); expect(new Headers(captured?.headers).get('x-csrf-token')).toBe('csrf'); expect(targets.some((target) => target.endsWith(`/api/v1/photos/${photoId}`))).toBe(true)
+	})
+
+	test('keeps photo review BFF routes explicit, typed, scoped to session and CSRF-protected', async () => {
+		process.env.VIZAJE_API_URL = 'http://127.0.0.1:3000'
+		const targets: string[] = []; let captured: RequestInit | undefined
+		globalThis.fetch = (async (input, init) => { targets.push(String(input)); captured = init; const target = String(input); if (target.endsWith('/history')) return upstream(200, { data: [] }); if (target.includes('/photo-reports?')) return upstream(200, { data: [reportPayload()], pagination: { page: 1, pageSize: 24, total: 1, totalPages: 1 } }); return upstream(200, reportPayload()) }) as typeof fetch
+		const list = await getReports(request(`/api/admin/photo-reports?storeId=${storeId}&status=pending`, { headers: { cookie: 'vizaje_session=session; tracking=secret' } }))
+		const detail = await getReport(request(`/api/admin/photo-reports/${reportId}`, { headers: { cookie: 'vizaje_session=session' } }), { params: Promise.resolve({ id: reportId }) })
+		const history = await getHistory(request(`/api/admin/photo-reports/${reportId}/history`, { headers: { cookie: 'vizaje_session=session' } }), { params: Promise.resolve({ id: reportId }) })
+		const checked = await checkReport(request(`/api/admin/photo-reports/${reportId}/check`, { method: 'POST', headers: { cookie: 'vizaje_session=session; tracking=secret', 'x-csrf-token': 'csrf', 'idempotency-key': 'review-key' }, body: JSON.stringify({ comment: 'ok' }) }), { params: Promise.resolve({ id: reportId }) })
+		expect(list.status).toBe(200); expect(detail.status).toBe(200); expect(history.status).toBe(200); expect(checked.status).toBe(200)
+		expect(targets.some((target) => target.includes(`/api/v1/photo-reports?`) && target.includes('status=pending'))).toBe(true)
+		expect(targets.some((target) => target.endsWith(`/api/v1/photo-reports/${reportId}/history`))).toBe(true)
+		expect(new Headers(captured?.headers).get('cookie')).toBe('vizaje_session=session'); expect(new Headers(captured?.headers).get('x-csrf-token')).toBe('csrf'); expect(new Headers(captured?.headers).get('idempotency-key')).toBe('review-key')
 	})
 
 	test('keeps dashboard routes explicit, typed and no-store', async () => {

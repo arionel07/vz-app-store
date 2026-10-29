@@ -5,14 +5,14 @@ import { useFocusEffect, useRouter } from 'expo-router'
 import { Camera, Check, CircleAlert, Image as ImageIcon, Inbox, LoaderCircle, RefreshCw, Store, Upload, X } from 'lucide-react-native'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native'
-import { ApiError, downloadPhotoImage, listPhotos, uploadPhoto } from '../../src/api/client'
+import { ApiError, downloadPhotoImage, listMyPhotoReports, resubmitPhotoReport, uploadPhoto } from '../../src/api/client'
 import { ActionButton, Card, EmptyState, InlineMessage, Screen, ScreenHeader, SectionTitle } from '../../src/components/ui'
 import { useAuth } from '../../src/auth/auth-context'
 import { preparePhoto } from '../../src/photos/image-processing'
 import { canStartUpload, createQueueItem, markFailed, markUploaded, markUploading, type UploadQueueItem } from '../../src/photos/upload-queue'
 import { availableStoreSelection, isAuthorizedStore } from '../../src/photos/store-selection'
 import { useAppTheme } from '../../src/theme'
-import type { PhotoResponse, StoreResponse } from '@vizaje/contracts'
+import type { PhotoReportResponse, StoreResponse } from '@vizaje/contracts'
 
 const MAX_PHOTOS_PER_BATCH = 10
 const MAX_HISTORY_PAGE_SIZE = 20
@@ -22,6 +22,7 @@ function errorMessage(error: unknown): string {
 		if (error.status === 401) return 'Сессия закончилась. Войдите в приложение снова.'
 		if (error.status === 403) return 'У вас нет доступа к этому магазину.'
 		if (error.status === 404) return 'Фотография больше недоступна.'
+			if (error.status === 400) return 'Проверьте данные фотографии и попробуйте снова.'
 		if (error.status === 413) return 'Фотография слишком большая для загрузки.'
 		if (error.status === 409) return 'Эта фотография уже загружается с другим ключом.'
 		if (error.code === 'UPLOAD_CANCELLED') return 'Загрузка отменена. Её можно повторить.'
@@ -45,7 +46,7 @@ export default function PhotosScreen() {
 	const [queue, setQueue] = useState<UploadQueueItem[]>([])
 	const [notice, setNotice] = useState<string | null>(null)
 	const [permissionNotice, setPermissionNotice] = useState(false)
-	const [history, setHistory] = useState<PhotoResponse[]>([])
+	const [history, setHistory] = useState<PhotoReportResponse[]>([])
 	const [historyLoading, setHistoryLoading] = useState(false)
 	const [historyRefreshing, setHistoryRefreshing] = useState(false)
 	const [historyError, setHistoryError] = useState<string | null>(null)
@@ -53,6 +54,7 @@ export default function PhotosScreen() {
 	const [historyTotalPages, setHistoryTotalPages] = useState(0)
 	const [imageUris, setImageUris] = useState<Record<string, string>>({})
 	const [uploading, setUploading] = useState(false)
+	const [resubmittingId, setResubmittingId] = useState<string | null>(null)
 	const imageRequests = useRef(new Set<string>())
 	const imageUrisRef = useRef<Record<string, string>>({})
 	const uploadAbortRef = useRef<AbortController | null>(null)
@@ -80,11 +82,11 @@ export default function PhotosScreen() {
 		setHistoryLoading(true)
 		setHistoryError(null)
 		try {
-			const response = await requestAuthenticated((token) => listPhotos(token, storeId, { page, pageSize: MAX_HISTORY_PAGE_SIZE }))
+			const response = await requestAuthenticated((token) => listMyPhotoReports(token, { storeId, page, pageSize: MAX_HISTORY_PAGE_SIZE }))
 			setHistory((current) => reset ? response.data : [...current, ...response.data.filter((item) => !current.some((existing) => existing.id === item.id))])
 			setHistoryPage(response.pagination.page)
 			setHistoryTotalPages(response.pagination.totalPages)
-			const imagesToLoad = response.data.filter((photo) => !imageUrisRef.current[photo.id] && !imageRequests.current.has(photo.id))
+			const imagesToLoad = response.data.map((report) => report.currentVersion.photo).filter((photo) => !imageUrisRef.current[photo.id] && !imageRequests.current.has(photo.id))
 			await Promise.all(imagesToLoad.map(async (photo) => {
 				imageRequests.current.add(photo.id)
 				try {
@@ -107,6 +109,22 @@ export default function PhotosScreen() {
 			setHistoryRefreshing(false)
 		}
 	}, [requestAuthenticated, storeSelection.selectedStoreId, stores])
+
+	const resubmitReport = useCallback(async (report: PhotoReportResponse) => {
+		if (report.currentVersion.status !== 'rejected' || resubmittingId) return
+		setNotice(null)
+		setResubmittingId(report.id)
+		try {
+			const permission = await ImagePicker.requestMediaLibraryPermissionsAsync(false)
+			if (!permission.granted) { setPermissionNotice(true); return }
+			const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 })
+			if (result.canceled || !result.assets[0]) return
+			const prepared = await preparePhoto(result.assets[0], `resubmission-${Crypto.randomUUID()}`)
+			await requestAuthenticated((token) => resubmitPhotoReport(token, report.id, { uri: prepared.uri, name: prepared.filename, type: prepared.mimeType }, Crypto.randomUUID()), { retryUnauthorized: false })
+			setNotice('Исправленная фотография отправлена на проверку.')
+			await loadHistory(1, true)
+		} catch (error) { setNotice(errorMessage(error)) } finally { setResubmittingId(null) }
+	}, [loadHistory, requestAuthenticated, resubmittingId])
 
 	useFocusEffect(useCallback(() => {
 		void loadHistory(1, true)
@@ -236,7 +254,7 @@ export default function PhotosScreen() {
 			<SectionTitle right={historyLoading ? <ActivityIndicator color={colors.muted} /> : <Pressable accessibilityLabel="Обновить историю" onPress={refreshHistory} hitSlop={10}><RefreshCw size={18} color={colors.muted} /></Pressable>}>История загрузок</SectionTitle>
 			{historyError && <InlineMessage title="История недоступна" body={historyError} actionLabel="Повторить" onAction={refreshHistory} />}
 			{!historyLoading && !historyError && history.length === 0 && <EmptyState icon={Inbox} title="История пока пуста" body={selectedStore ? 'Загруженные фотографии появятся здесь.' : 'Выберите активный магазин, чтобы увидеть историю.'} />}
-			{history.length > 0 && <View style={styles.historyGrid}>{history.map((photo) => <HistoryCard key={photo.id} photo={photo} storeName={storeName(photo.storeId)} uri={imageUris[photo.id]} colors={colors} />)}</View>}
+			{history.length > 0 && <View style={styles.historyGrid}>{history.map((report) => <HistoryCard key={report.id} report={report} storeName={storeName(report.storeId)} uri={imageUris[report.currentVersion.photo.id]} colors={colors} onResubmit={() => void resubmitReport(report)} resubmitting={resubmittingId === report.id} />)}</View>}
 			{historyPage < historyTotalPages && <ActionButton label="Загрузить ещё" variant="secondary" onPress={() => void loadHistory(historyPage + 1, false)} disabled={historyLoading} />}
 		</View>
 
@@ -254,8 +272,11 @@ function QueueCard({ item, colors, onRemove, onRetry, retryDisabled }: { item: U
 	return <View style={[styles.queueCard, { backgroundColor: colors.surfaceRaised }]}><View style={styles.previewWrap}><Image source={item.uri} contentFit="cover" style={styles.preview} /><Pressable accessibilityLabel="Удалить фото" hitSlop={8} onPress={onRemove} disabled={item.status === 'uploading'} style={[styles.removeButton, { backgroundColor: colors.surface }]}><X size={15} color={colors.text} /></Pressable></View><Text numberOfLines={1} style={[styles.fileName, { color: colors.text }]}>{item.filename}</Text><View style={styles.statusRow}>{item.status === 'uploading' ? <ActivityIndicator size="small" color={colors.muted} /> : item.status === 'uploaded' ? <Check size={15} color={colors.success} /> : item.status === 'failed' ? <CircleAlert size={15} color={colors.danger} /> : null}<Text style={[styles.statusText, { color: item.status === 'failed' ? colors.danger : item.status === 'uploaded' ? colors.success : colors.muted }]}>{status}</Text></View>{item.status === 'failed' && <Pressable onPress={onRetry} disabled={retryDisabled} accessibilityRole="button" style={{ opacity: retryDisabled ? 0.45 : 1 }}><Text style={[styles.retryText, { color: colors.accent }]}>Повторить</Text></Pressable>}</View>
 }
 
-function HistoryCard({ photo, storeName, uri, colors }: { photo: PhotoResponse; storeName: string; uri?: string; colors: ReturnType<typeof useAppTheme>['colors'] }) {
-	return <View style={[styles.historyCard, { backgroundColor: colors.surfaceRaised }]}>{uri ? <Image source={uri} contentFit="cover" style={styles.historyImage} /> : <View style={[styles.historyPlaceholder, { backgroundColor: colors.surface }]}><LoaderCircle size={22} color={colors.muted} /></View>}<Text numberOfLines={1} style={[styles.historyStore, { color: colors.text }]}>{storeName}</Text><Text style={[styles.historyDate, { color: colors.muted }]}>{dateLabel(photo.createdAt)}</Text></View>
+function HistoryCard({ report, storeName, uri, colors, onResubmit, resubmitting }: { report: PhotoReportResponse; storeName: string; uri?: string; colors: ReturnType<typeof useAppTheme>['colors']; onResubmit: () => void; resubmitting: boolean }) {
+	const photo = report.currentVersion.photo
+	const status = report.currentVersion.status === 'checked' ? 'Проверено' : report.currentVersion.status === 'rejected' ? 'Отклонено' : 'На проверке'
+	const statusColor = report.currentVersion.status === 'rejected' ? colors.danger : report.currentVersion.status === 'checked' ? colors.success : colors.muted
+	return <View style={[styles.historyCard, { backgroundColor: colors.surfaceRaised }]}>{uri ? <Image source={uri} contentFit="cover" style={styles.historyImage} /> : <View style={[styles.historyPlaceholder, { backgroundColor: colors.surface }]}><LoaderCircle size={22} color={colors.muted} /></View>}<Text numberOfLines={1} style={[styles.historyStore, { color: colors.text }]}>{storeName}</Text><Text style={[styles.historyDate, { color: colors.muted }]}>{dateLabel(report.currentVersion.submittedAt)}</Text><Text style={[styles.historyStatus, { color: statusColor }]}>{status}</Text>{report.currentVersion.status === 'rejected' && <><Text style={[styles.rejectionText, { color: colors.muted }]} numberOfLines={3}>{report.currentVersion.rejectionComment ?? 'Требуется исправление фотографии.'}</Text><ActionButton label={resubmitting ? 'Подготовка…' : 'Загрузить исправленное фото'} variant="secondary" onPress={onResubmit} disabled={resubmitting} /></>}</View>
 }
 
 const styles = StyleSheet.create({
@@ -288,6 +309,8 @@ const styles = StyleSheet.create({
 	historyPlaceholder: { width: '100%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
 	historyStore: { marginTop: 8, fontSize: 13, fontWeight: '600' },
 	historyDate: { marginTop: 3, fontSize: 12 },
+	historyStatus: { marginTop: 6, fontSize: 12, fontWeight: '700' },
+	rejectionText: { marginTop: 5, fontSize: 12, lineHeight: 17 },
 	bottomNote: { gap: 6, borderTopWidth: 1, paddingTop: 16 },
 	bottomNoteText: { fontSize: 13, lineHeight: 18 },
 })

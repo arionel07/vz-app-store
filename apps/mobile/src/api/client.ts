@@ -12,6 +12,8 @@ import {
 	storeListResponseSchema,
 	photoListResponseSchema,
 	photoResponseSchema,
+	photoReportListResponseSchema,
+	photoReviewMutationResponseSchema,
 	employeeProfileSafeResponseSchema,
 	userResponseSchema,
 	type AttemptListQuery,
@@ -25,6 +27,8 @@ import {
 	type StoreListResponse,
 	type PhotoListResponse,
 	type PhotoResponse,
+	type PhotoReportListResponse,
+	type PhotoReviewMutationResponse,
 	type SubmitAttemptInput,
 	type UserResponse,
 	type EmployeeProfileSafeResponse,
@@ -231,6 +235,13 @@ export function listPhotos(token: string, storeId: string, query: { page?: numbe
 	return requestJson(`/api/v1/stores/${encodeURIComponent(storeId)}/photos?${params.toString()}`, photoListResponseSchema, { token, allowRetry: true })
 }
 
+export function listMyPhotoReports(token: string, query: { page?: number; pageSize?: number; storeId?: string; status?: 'pending' | 'checked' | 'rejected' } = {}): Promise<PhotoReportListResponse> {
+	const params = new URLSearchParams({ page: String(query.page ?? 1), pageSize: String(query.pageSize ?? 20) })
+	if (query.storeId) params.set('storeId', query.storeId)
+	if (query.status) params.set('status', query.status)
+	return requestJson(`/api/v1/me/photo-reports?${params.toString()}`, photoReportListResponseSchema, { token, allowRetry: true })
+}
+
 export async function uploadPhoto(token: string, storeId: string, file: PhotoUploadFile, idempotencyKey: string, options: PhotoUploadOptions = {}): Promise<PhotoResponse> {
 	const form = new FormData()
 	// React Native fetch turns this descriptor into a multipart file part. Do not
@@ -270,6 +281,28 @@ export async function uploadPhoto(token: string, storeId: string, file: PhotoUpl
 	} finally {
 		clearTimeout(timeout)
 		options.signal?.removeEventListener('abort', abortUpload)
+	}
+}
+
+export async function resubmitPhotoReport(token: string, reportId: string, file: PhotoUploadFile, idempotencyKey: string): Promise<PhotoReviewMutationResponse> {
+	const form = new FormData()
+	form.append('file', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob)
+	try {
+		const response = await fetch(`${apiOrigin()}/api/v1/photo-reports/${encodeURIComponent(reportId)}/resubmit`, {
+			method: 'POST',
+			headers: { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Idempotency-Key': idempotencyKey },
+			body: form,
+			credentials: 'omit',
+		})
+		let body: unknown = null
+		try { body = await response.json() } catch { body = null }
+		if (!response.ok) throw requestError(response.status, body)
+		const parsed = photoReviewMutationResponseSchema.safeParse(body)
+		if (!parsed.success) throw new ApiError(502, 'INVALID_API_RESPONSE', 'Сервер вернул некорректный ответ')
+		return parsed.data
+	} catch (error) {
+		if (error instanceof ApiError) throw error
+		throw new ApiError(0, 'NETWORK_UNAVAILABLE', 'Сервис временно недоступен')
 	}
 }
 

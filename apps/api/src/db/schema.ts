@@ -5,6 +5,7 @@ import {
   date,
   integer,
   index,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -20,6 +21,7 @@ export const quizLifecycleEnum = pgEnum("quiz_lifecycle", ["draft", "published",
 export const quizRevisionStatusEnum = pgEnum("quiz_revision_status", ["draft", "published", "archived"]);
 export const quizAssignmentModeEnum = pgEnum("quiz_assignment_mode", ["all", "selected"]);
 export const quizAttemptStatusEnum = pgEnum("quiz_attempt_status", ["in_progress", "submitted"]);
+export const photoReviewStatusEnum = pgEnum("photo_review_status", ["pending", "checked", "rejected"]);
 
 export const users = pgTable(
   "users",
@@ -138,6 +140,95 @@ export const photos = pgTable(
     check("photos_file_size_positive_check", sql`${table.fileSize} > 0`),
     check("photos_file_size_max_check", sql`${table.fileSize} <= 26214400`),
     check("photos_mime_type_check", sql`${table.mimeType} in ('image/jpeg', 'image/png', 'image/webp')`),
+  ],
+);
+
+export const photoReports = pgTable(
+  "photo_reports",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id, { onDelete: "restrict" }),
+    submittedBy: uuid("submitted_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("photo_reports_store_updated_idx").on(table.storeId, table.updatedAt),
+    index("photo_reports_submitted_updated_idx").on(table.submittedBy, table.updatedAt),
+  ],
+);
+
+export const photoReportVersions = pgTable(
+  "photo_report_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    reportId: uuid("report_id")
+      .notNull()
+      .references(() => photoReports.id, { onDelete: "restrict" }),
+    photoId: uuid("photo_id")
+      .notNull()
+      .references(() => photos.id, { onDelete: "restrict" }),
+    versionNumber: integer("version_number").notNull(),
+    status: photoReviewStatusEnum("status").notNull().default("pending"),
+    rejectionComment: text("rejection_comment"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("photo_report_versions_report_number_unique").on(table.reportId, table.versionNumber),
+    uniqueIndex("photo_report_versions_photo_unique").on(table.photoId),
+    index("photo_report_versions_report_status_idx").on(table.reportId, table.status),
+  ],
+);
+
+export const photoReviewHistory = pgTable(
+  "photo_review_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    reportId: uuid("report_id")
+      .notNull()
+      .references(() => photoReports.id, { onDelete: "restrict" }),
+    versionId: uuid("version_id")
+      .notNull()
+      .references(() => photoReportVersions.id, { onDelete: "restrict" }),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    fromStatus: photoReviewStatusEnum("from_status"),
+    toStatus: photoReviewStatusEnum("to_status").notNull(),
+    comment: text("comment"),
+    idempotencyKey: text("idempotency_key"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("photo_review_history_report_created_idx").on(table.reportId, table.createdAt),
+    index("photo_review_history_version_created_idx").on(table.versionId, table.createdAt),
+    uniqueIndex("photo_review_history_idempotency_unique").on(table.versionId, table.actorId, table.idempotencyKey),
+  ],
+);
+
+export const domainEvents = pgTable(
+  "domain_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventType: text("event_type").notNull(),
+    aggregateType: text("aggregate_type").notNull(),
+    aggregateId: uuid("aggregate_id").notNull(),
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    payload: jsonb("payload").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("domain_events_type_aggregate_created_unique").on(table.eventType, table.aggregateId, table.createdAt),
+    index("domain_events_aggregate_idx").on(table.aggregateType, table.aggregateId),
+    index("domain_events_occurred_idx").on(table.occurredAt),
   ],
 );
 

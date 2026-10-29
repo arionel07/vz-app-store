@@ -47,11 +47,11 @@ The Drizzle schema currently contains these PostgreSQL structures:
 | Organization | `stores`, `user_stores` | Store directory and many-to-many memberships |
 | Sessions | `sessions`, `session_type` | Browser/mobile sessions, token hashes, expiry, revocation |
 | Activation | `activation_tokens` | Five-minute, hashed, single-use staff activation secrets |
-| Photos | `photos` | Private upload metadata and storage key; no review state/history |
+| Photos | `photos`, `photo_reports`, `photo_report_versions`, `photo_review_history`, `domain_events` | Private media plus versioned review state, immutable history, and durable review events |
 | Quizzes | `quizzes`, `quiz_revisions`, `quiz_questions`, `quiz_options`, `quiz_assignments` | Draft/published/archive lifecycle, revision graph and store assignment |
 | Attempts | `quiz_attempts`, `quiz_attempt_answers`, `quiz_attempt_status` | One active attempt per user/revision and server-calculated result |
 
-There are seven Drizzle migrations (`0000`–`0007`). The schema currently has no employee profile table, photo review tables, schedule tables, task tables, notification/outbox tables, knowledge base tables, or operational campaign tables. No migration is proposed or created in this planning milestone.
+There are ten Drizzle migrations (`0000`–`0009`). The employee profile and photo review migrations are additive and backfill only deterministic relationships. Schedule, task, notification/outbox, knowledge base, and operational campaign tables are still outside the implemented scope.
 
 The existing `users` table mixes identity/contact fields with authentication state. `password_hash` is nullable, which supports activated staff accounts that do not yet have a password. API responses correctly omit the hash. `user_stores` is the existing relationship for multi-store assignment.
 
@@ -103,7 +103,7 @@ Staff upload one JPEG, PNG, or WebP file to an assigned active store. The API va
 
 Uploads support an idempotency key scoped to the uploader and payload. Reads are private and authorization-aware; image responses are non-cacheable. Local filesystem storage is used in development/tests and S3 is required for production configuration.
 
-The current `photos` table is an upload record only. It has no `PENDING`, `CHECKED`, `REJECTED`, or `RESUBMITTED` status, reviewer, comment, review timestamp, parent submission, or history. There are no photo domain events and no notification infrastructure.
+The `photos` table remains the private immutable media record. Milestone 13 adds a `photo_reports` parent, immutable `photo_report_versions`, `photo_review_history`, and durable `domain_events`. Legacy photos are represented as `PENDING` initial versions with an explicit historical note; they are not treated as approved. Rejected resubmissions create a new media/version row and retain prior versions. There is still no notification delivery infrastructure.
 
 ### 2.7 Admin, Mobile, and shared contracts
 
@@ -137,8 +137,8 @@ There are no tests for the future modules described below because those modules 
 | Quiz revisions and basic results | Implemented | Add question/assessment capabilities through new revision fields/tables |
 | Private photo upload/history | Implemented | Add review aggregate/history without making old uploads public or mutable |
 | Dashboard aggregates | Implemented | Extend only after event/status definitions are stable |
-| Employee HR profile | Not implemented | Milestone 12 |
-| Photo review and resubmission | Not implemented | Milestone 13 |
+| Employee HR profile | Implemented | Milestone 12 is complete; profile media remains deferred |
+| Photo review and resubmission | Implemented | Milestone 13 is complete on the SDK 58 upgrade branch |
 | Advanced quiz engine | Not implemented | Milestone 14 |
 | Work schedules | Not implemented | Milestone 15 |
 | Tasks/checklists | Not implemented | Milestone 16 |
@@ -449,7 +449,7 @@ Dependencies: current users/stores/auth services; business approval of optional 
 - **Automated tests:** Field authorization, manager scope, self-access, validation, inactive users, migration/backfill, and contract parsing. Add profile-media tests only with its dedicated design.
 - **Acceptance criteria:** Admin can edit approved profile fields; managers cannot read out-of-scope/sensitive fields; staff can see only their own allowed profile; profile images remain explicitly unavailable until a secure media ownership design is approved; existing login, activation, and store assignment behavior is unchanged.
 
-### Milestone 13 — Photo review workflow
+### Milestone 13 — Photo review workflow (implemented on `upgrade/mobile-expo-sdk-58`)
 
 Dependencies: Milestone 12 identity projections; current private photo storage and idempotent upload behavior.
 
@@ -459,7 +459,7 @@ Dependencies: Milestone 12 identity projections; current private photo storage a
 - **Shared contracts:** Add status enums, report/version responses, transition inputs, history entries, and event-safe DTOs.
 - **Database migrations:** Backfill legacy photos into a compatible initial report state; add review parent/version/history tables and indexes.
 - **Automated tests:** State machine, rejection reason, duplicate/concurrent transitions, cross-store denial, private image authorization, resubmission history, idempotency, and event creation.
-- **Acceptance criteria:** New uploads begin `PENDING`; authorized reviewers can approve/reject only in scope; rejection requires a reason; resubmission preserves all prior versions; viewing never approves; no token/object URL leaks.
+- **Acceptance criteria:** New uploads begin `PENDING`; authorized reviewers can approve/reject only in scope; rejection requires a reason; resubmission preserves all prior versions; viewing never approves; no token/object URL leaks. Review-linked media deletion is retained only for still-pending single-version records; checked/rejected histories are protected from deletion.
 
 ### Milestone 14 — Advanced quiz engine
 
@@ -609,4 +609,4 @@ These questions should be answered before implementation of the corresponding mi
 
 The current repository is not missing a backend foundation; it has a working identity/store/authentication layer, private photo storage, revisioned quizzes, results, dashboard aggregates, and explicit Admin/Mobile clients. The future work is additive domain expansion.
 
-The recommended first implementation is Milestone 12, followed by the photo review model in Milestone 13. That sequence addresses the largest current data-model gaps and establishes reusable audit/event conventions before schedules, tasks, notifications, and reporting are added. No Milestone 12 implementation is part of this document.
+Milestones 12 and 13 address the largest current data-model gaps and establish reusable profile, review, audit, and event conventions before schedules, tasks, notifications, and reporting are added. Milestone 14 remains the next planned product milestone and is intentionally out of scope here.

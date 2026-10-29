@@ -17,6 +17,7 @@ const MANAGEMENT_API_PREFIXES = [
 	'/api/v1/stores',
 	'/api/v1/management/quizzes',
 	'/api/v1/photos',
+	'/api/v1/photo-reports',
 	'/api/v1/dashboard/overview',
 	'/api/v1/dashboard/photos',
 	'/api/v1/dashboard/quizzes',
@@ -86,6 +87,7 @@ export interface BffFetchOptions {
 	body?: string
 	cookieHeader?: string | null
 	csrfToken?: string | null
+	idempotencyKey?: string | null
 	userAgent?: string | null
 }
 
@@ -95,6 +97,7 @@ export async function fetchBffApi(path: string, options: BffFetchOptions = {}): 
 	if (options.body) headers.set('Content-Type', 'application/json')
 	if (options.cookieHeader) headers.set('Cookie', options.cookieHeader)
 	if (options.csrfToken) headers.set('X-CSRF-Token', options.csrfToken)
+	if (options.idempotencyKey) headers.set('Idempotency-Key', options.idempotencyKey)
 	if (options.userAgent) headers.set('User-Agent', options.userAgent)
 
 	return fetch(getApiUrl(path), {
@@ -128,6 +131,7 @@ export function getManagementRequestOptions(request: Request, options: { body?: 
 		body: options.body,
 		cookieHeader: getSessionCookieHeader(request.headers.get('cookie')),
 		csrfToken: request.headers.get('x-csrf-token'),
+		idempotencyKey: request.headers.get('idempotency-key'),
 		userAgent: request.headers.get('user-agent'),
 	}
 }
@@ -143,6 +147,7 @@ export function getAuthRequestOptions(request: Request, options: { body?: string
 		body: options.body,
 		cookieHeader: getSessionCookieHeader(request.headers.get('cookie')),
 		csrfToken: request.headers.get('x-csrf-token'),
+		idempotencyKey: request.headers.get('idempotency-key'),
 		userAgent: request.headers.get('user-agent'),
 	}
 }

@@ -135,12 +135,19 @@ Photo uploads are private and require an authenticated principal. Active staff c
 - `GET /api/v1/stores/:storeId/photos` lists photos for an authorized store.
 - `GET /api/v1/photos/:id` streams the private image after authorization.
 - `DELETE /api/v1/photos/:id` permanently deletes a photo; only administrators may call it.
+- `GET /api/v1/photo-reports` lists versioned reports for administrators and scoped managers; staff are restricted to their own active-store reports.
+- `GET /api/v1/me/photo-reports` lists the authenticated staff member's reports with current review status and rejection comment.
+- `GET /api/v1/photo-reports/:id` and `/history` return the authorized report versions and immutable transition history.
+- `POST /api/v1/photo-reports/:id/check` and `/reject` are manager/admin-only, scope-checked transitions; rejection requires a comment.
+- `POST /api/v1/photo-reports/:id/resubmit` accepts a corrected multipart image and creates a new pending version without overwriting prior media.
 
 The API validates the multipart size, declared MIME type, image signature, actual decodability, maximum dimension (8192 pixels), and maximum pixel count (25 million by default). Sharp safely re-encodes accepted JPEG, PNG, and WebP images, applying EXIF orientation and dropping metadata such as GPS coordinates. Storage keys are server-generated UUID paths and are never returned to clients. Images are not stored in PostgreSQL; only metadata and the storage key are persisted. Downloads use private, non-cacheable responses and no public object URLs.
 
 Upload retries may send an `Idempotency-Key` (up to 128 allowed characters). The key is scoped to the authenticated uploader and is bound to the store, MIME type, filename, and original bytes. Reusing it with a different payload returns `409`; concurrent retries converge on one photo record. Failed validation or storage writes do not reserve a key, so a corrected retry is safe.
 
-Administrator deletion removes the private storage object before deleting its database metadata. If storage deletion fails, metadata remains and the request returns `503`; if the database delete fails after storage deletion, the metadata remains for a safe retry. Storage deletes are idempotent, so repeating the request converges to no object and no row. This is an intentionally simple retry-based consistency strategy, not a background cleanup queue.
+Administrator deletion removes the private storage object before deleting its database metadata. A report-linked checked/rejected or multi-version photo is retained to protect review history; a single pending version can still be removed for backwards-compatible cleanup. If storage deletion fails, metadata remains and the request returns `503`; if the database delete fails after storage deletion, the metadata remains for a safe retry. Storage deletes are idempotent, so repeating the request converges to no object and no row. This is an intentionally simple retry-based consistency strategy, not a background cleanup queue.
+
+New uploads create a `PENDING` report/version, and legacy rows are backfilled as explicitly unapproved `PENDING` versions. Review transitions write `photo.submitted`, `photo.checked`, `photo.rejected`, and `photo.resubmitted` records to `domain_events` in the same database transaction. Event payloads contain safe identifiers only; no storage keys, session tokens, or image bytes are emitted.
 
 Development and tests use private local filesystem storage at `PHOTO_STORAGE_PATH` (default `./.data/photos`). Production startup requires `PHOTO_STORAGE_DRIVER=s3` plus the S3-compatible bucket and credentials. S3 writes request server-side AES-256 encryption. Do not commit storage credentials or reuse development credentials in production.
 

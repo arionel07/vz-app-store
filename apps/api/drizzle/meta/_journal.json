@@ -64,6 +64,20 @@
       "when": 1793318400000,
       "tag": "0008_employee_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793319000000,
+      "tag": "0009_photo_review_workflow",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793319300000,
+      "tag": "0010_photo_review_idempotency",
+      "breakpoints": true
     }
   ]
 }
