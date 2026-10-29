@@ -28,6 +28,7 @@ export const quizReviewStatusEnum = pgEnum("quiz_review_status", ["not_required"
 export const quizAnswerReviewStatusEnum = pgEnum("quiz_answer_review_status", ["not_required", "pending", "reviewed"]);
 export const quizAssignmentTargetTypeEnum = pgEnum("quiz_assignment_target_type", ["store", "role", "user"]);
 export const photoReviewStatusEnum = pgEnum("photo_review_status", ["pending", "checked", "rejected"]);
+export const scheduleStatusEnum = pgEnum("schedule_status", ["draft", "published"]);
 
 export const users = pgTable(
   "users",
@@ -533,5 +534,93 @@ export const quizAnswerPhotos = pgTable(
   (table) => [
     uniqueIndex("quiz_answer_photos_attempt_question_unique").on(table.attemptId, table.questionId),
     uniqueIndex("quiz_answer_photos_photo_unique").on(table.photoId),
+  ],
+);
+
+export const schedulePeriods = pgTable(
+  "schedule_periods",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "restrict" }),
+    startDate: date("start_date", { mode: "string" }).notNull(),
+    endDate: date("end_date", { mode: "string" }).notNull(),
+    timezone: text("timezone").notNull().default("Europe/Chisinau"),
+    status: scheduleStatusEnum("status").notNull().default("draft"),
+    revision: integer("revision").notNull().default(1),
+    supersededAt: timestamp("superseded_at", { withTimezone: true }),
+    createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    publishedBy: uuid("published_by").references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("schedule_periods_store_dates_idx").on(table.storeId, table.startDate, table.endDate),
+    index("schedule_periods_status_idx").on(table.status, table.supersededAt),
+    check("schedule_periods_date_order_check", sql`${table.startDate} <= ${table.endDate}`),
+  ],
+);
+
+export const scheduleShifts = pgTable(
+  "schedule_shifts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    periodId: uuid("period_id").notNull().references(() => schedulePeriods.id, { onDelete: "cascade" }),
+    employeeId: uuid("employee_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "restrict" }),
+    localDate: date("local_date", { mode: "string" }).notNull(),
+    startTime: text("start_time").notNull(),
+    endTime: text("end_time").notNull(),
+    startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+    endAt: timestamp("end_at", { withTimezone: true }).notNull(),
+    timezone: text("timezone").notNull(),
+    note: text("note"),
+    createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    updatedBy: uuid("updated_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("schedule_shifts_period_date_idx").on(table.periodId, table.localDate),
+    index("schedule_shifts_employee_time_idx").on(table.employeeId, table.startAt, table.endAt),
+    check("schedule_shifts_time_order_check", sql`${table.startAt} < ${table.endAt}`),
+  ],
+);
+
+export const scheduleDaysOff = pgTable(
+  "schedule_days_off",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    periodId: uuid("period_id").notNull().references(() => schedulePeriods.id, { onDelete: "cascade" }),
+    employeeId: uuid("employee_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "restrict" }),
+    localDate: date("local_date", { mode: "string" }).notNull(),
+    note: text("note"),
+    createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    updatedBy: uuid("updated_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("schedule_days_off_employee_date_unique").on(table.periodId, table.employeeId, table.localDate),
+    index("schedule_days_off_period_date_idx").on(table.periodId, table.localDate),
+  ],
+);
+
+export const scheduleHistory = pgTable(
+  "schedule_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    scheduleId: uuid("schedule_id").notNull().references(() => schedulePeriods.id, { onDelete: "restrict" }),
+    actorId: uuid("actor_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: uuid("entity_id"),
+    before: jsonb("before"),
+    after: jsonb("after"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("schedule_history_schedule_created_idx").on(table.scheduleId, table.createdAt),
   ],
 );

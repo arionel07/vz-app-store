@@ -9,6 +9,7 @@ import { createQuizAttemptService } from "../domain/quizzes/attempt-service";
 import { createQuizService } from "../domain/quizzes/service";
 import { createPhotosService } from "../domain/photos/service";
 import { createDashboardService } from "../domain/dashboard/service";
+import { createSchedulesService } from "../domain/schedules/service";
 import { createLogger } from "../lib/logger";
 import { createPhotoStorage } from "../storage/photo-storage";
 import { createShutdownHandler } from "./shutdown";
@@ -35,6 +36,7 @@ export function startServer() {
       users: usersService,
       stores: createStoresService(db),
       profiles: createEmployeeProfileService(db, usersService),
+      schedules: createSchedulesService(db),
     },
     resolvePrincipal: auth.principalResolver(),
     authRoutes: {

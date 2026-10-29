@@ -23,6 +23,7 @@ const MANAGEMENT_API_PREFIXES = [
 	'/api/v1/dashboard/overview',
 	'/api/v1/dashboard/photos',
 	'/api/v1/dashboard/quizzes',
+	'/api/v1/management/schedules',
 ]
 const ACTIVATION_API_PREFIX = '/api/v1/auth/activation'
 const NO_STORE_HEADERS = {

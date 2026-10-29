@@ -82,6 +82,12 @@ Production configuration, backup/restore, reverse-proxy, S3, and reconciliation 
 
 Users and Stores domain services and contracts are now available for trusted application callers. Management HTTP routes use the authenticated trusted principal resolver; client-supplied role or user ID headers are ignored.
 
+## Work schedules
+
+Milestone 15 adds timezone-aware employee schedules for active stores. Management users can create draft periods, add/edit/remove shifts and days off, publish a revision, create an explicit revision of a published period, and inspect actor history. Staff can read only their own current published schedule through `GET /api/v1/me/schedule?from=YYYY-MM-DD&to=YYYY-MM-DD`.
+
+Schedule times are entered as local wall-clock values and stored with UTC instants plus the IANA timezone snapshot (default `Europe/Chisinau`). Overnight shifts keep the starting business date. Nonexistent and ambiguous DST times are rejected. Publication and superseding revisions, mutations, and history are written transactionally with `schedule.updated` or `schedule.published` domain events. Payroll, attendance, swaps, and vacation workflows are intentionally out of scope.
+
 ## Authentication
 
 - `POST /api/v1/auth/login` authenticates active admin/manager accounts with email and password.

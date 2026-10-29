@@ -32,6 +32,8 @@ import {
 	type SubmitAttemptInput,
 	type UserResponse,
 	type EmployeeProfileSafeResponse,
+	type StaffScheduleResponse,
+	staffScheduleResponseSchema,
 } from '@vizaje/contracts'
 
 const REQUEST_TIMEOUT_MS = 10_000
@@ -169,6 +171,11 @@ export function getCurrentUser(token: string): Promise<UserResponse> {
 
 export function getMyProfile(token: string): Promise<EmployeeProfileSafeResponse> {
 	return requestJson('/api/v1/me/profile', employeeProfileSafeResponseSchema, { token, allowRetry: true })
+}
+
+export function getMySchedule(token: string, from: string, to: string): Promise<StaffScheduleResponse> {
+	const params = new URLSearchParams({ from, to })
+	return requestJson(`/api/v1/me/schedule?${params.toString()}`, staffScheduleResponseSchema, { token, allowRetry: true })
 }
 
 export function listStores(token: string, query: StoreListQuery = { page: 1, pageSize: 100, sortBy: 'name', sortDirection: 'asc' }): Promise<StoreListResponse> {

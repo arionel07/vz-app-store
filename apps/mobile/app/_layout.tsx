@@ -39,6 +39,7 @@ export default function RootLayout() {
 		<AuthGate><Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
 			<Stack.Screen name="(tabs)" />
 			<Stack.Screen name="profile" />
+			<Stack.Screen name="schedule" />
 			<Stack.Screen name="activation" />
 			<Stack.Screen name="activate" />
 			<Stack.Screen name="quiz/[id]" />

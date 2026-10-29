@@ -140,7 +140,7 @@ There are no tests for the future modules described below because those modules 
 | Employee HR profile | Implemented | Milestone 12 is complete; profile media remains deferred |
 | Photo review and resubmission | Implemented | Milestone 13 is complete on the SDK 58 upgrade branch |
 | Advanced quiz engine | Implemented | Milestone 14 |
-| Work schedules | Not implemented | Milestone 15 |
+| Work schedules | Implemented | Milestone 15; timezone-aware draft/publication/history flow, Admin editor, and staff Mobile read-only schedule |
 | Tasks/checklists | Not implemented | Milestone 16 |
 | In-app/push notifications and announcements | Not implemented | Milestone 17 |
 | Knowledge base | Not implemented | Milestone 18 |
@@ -487,6 +487,8 @@ Dependencies: employee profiles, store timezone decisions, current memberships a
 - **Automated tests:** Local-to-UTC conversion, DST/overnight cases, overlap conflicts, scope, publish immutability/history, inactive employee/store behavior, and mobile date rendering.
 - **Acceptance criteria:** Managers publish only their scope; staff see only their schedule; overlapping shifts are rejected; overnight shifts remain correct; published history is auditable; attendance/payroll are not introduced.
 
+Status: implemented on the SDK 58 upgrade branch. The additive `0012_work_schedules` migration adds draft/published periods, timezone snapshots, shifts with local business dates and UTC instants, days off, and actor history. The API uses PostgreSQL transaction-scoped advisory locks for employee/store mutations, rejects overlap and DST-invalid local times, and supersedes overlapping current publications atomically. Admin exposes scoped period management, shift/day-off CRUD, publication, revision, and history. Mobile exposes the authenticated employee's published schedule only. Payroll, attendance, shift swaps, vacation, and Milestone 16 tasks are not included.
+
 ### Milestone 16 — Tasks and checklists
 
 Dependencies: review/audit conventions from Milestone 13; photo evidence access; store scope.
@@ -611,4 +613,4 @@ These questions should be answered before implementation of the corresponding mi
 
 The current repository is not missing a backend foundation; it has a working identity/store/authentication layer, private photo storage, revisioned quizzes, results, dashboard aggregates, and explicit Admin/Mobile clients. The future work is additive domain expansion.
 
-Milestones 12–14 address employee profiles, photo review, and the advanced revisioned quiz engine. Schedules, tasks, notifications, knowledge base, retail operations, and advanced reporting remain future milestones.
+Milestones 12–15 address employee profiles, photo review, the advanced revisioned quiz engine, and work schedules. Tasks, notifications, knowledge base, retail operations, and advanced reporting remain future milestones.

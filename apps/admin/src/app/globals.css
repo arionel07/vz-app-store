@@ -192,6 +192,26 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .sidebar-bottom > .nav-item { color: var(--muted-foreground); }
 .sidebar-rule { margin: 9px 8px; }
 .sidebar-footnote { margin: 0 10px; color: var(--tertiary); font-size: 10px; }
+
+.schedule-period-list { display: grid; gap: 4px; }
+.schedule-period-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--foreground); padding: 10px; text-align: left; }
+.schedule-period-row:hover, .schedule-period-row-active { border-color: var(--border); background: var(--surface-raised); }
+.schedule-period-row > span { display: grid; min-width: 0; gap: 3px; }
+.schedule-period-row small { color: var(--muted-foreground); font-size: 11px; }
+.schedule-week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; overflow-x: auto; }
+.schedule-day-column { min-height: 210px; border: 1px solid var(--border); border-radius: 10px; background: var(--background); padding: 8px; }
+.schedule-day-heading { display: grid; gap: 2px; margin-bottom: 9px; color: var(--foreground); font-size: 11px; }
+.schedule-day-heading small { color: var(--muted-foreground); font-size: 10px; }
+.schedule-shift-card, .schedule-day-off { position: relative; display: grid; gap: 3px; margin-bottom: 6px; border-radius: 8px; background: color-mix(in srgb, var(--brand-blue) 9%, var(--surface)); padding: 8px; color: var(--foreground); font-size: 10px; }
+.schedule-shift-card span, .schedule-shift-card small { color: var(--muted-foreground); }
+.schedule-shift-card button, .schedule-day-off button { position: absolute; top: 6px; right: 5px; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted-foreground); padding: 2px; }
+.schedule-shift-card button:first-of-type { right: 25px; }
+.schedule-day-off { display: flex; align-items: center; justify-content: space-between; background: color-mix(in srgb, var(--brand-orange) 12%, var(--surface)); color: var(--foreground); }
+.schedule-add-form { display: flex; align-items: end; flex-wrap: wrap; gap: 7px; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 14px; }
+.schedule-add-form > strong { width: 100%; font-size: 12px; }
+.schedule-add-form .field-control { max-width: 155px; }
+.schedule-history-note { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; color: var(--muted-foreground); font-size: 11px; line-height: 1.5; }
+.schedule-history-note p { margin: 5px 0 0; }
 .app-main { margin-left: 218px; padding: 0 28px 30px; }
 .topbar { height: 62px; border-bottom: 1px solid transparent; }
 .global-search { display: flex; width: min(440px, 48vw); height: 32px; align-items: center; gap: 9px; margin: 0 auto; border: 1px solid #e3e6eb; border-radius: 8px; background: #fff; color: #8a919c; padding: 0 10px; font-size: 11px; }

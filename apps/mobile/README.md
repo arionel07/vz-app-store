@@ -36,3 +36,9 @@ submission. Photo uploads and private photo history use authenticated API
 requests; uploads are foreground-only and are not persisted after the app is
 terminated. See [NATIVE_QA.md](./NATIVE_QA.md) for native build and manual QA
 instructions.
+
+The Home screen also opens a read-only schedule view. It requests only the
+authenticated staff member's published schedule with a bounded local date
+range; drafts, other employees, and unauthorized stores are never shown by
+the API. Local shift times and overnight business dates come from the
+server's timezone-aware schedule contract.

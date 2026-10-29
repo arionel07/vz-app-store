@@ -8,17 +8,27 @@ import {
   updateUserSchema,
   userListQuerySchema,
   employeeProfileUpdateSchema,
+  scheduleDayOffCreateSchema,
+  scheduleDayOffUpdateSchema,
+  scheduleListQuerySchema,
+  schedulePeriodCreateSchema,
+  schedulePeriodUpdateSchema,
+  scheduleShiftCreateSchema,
+  scheduleShiftUpdateSchema,
+  staffScheduleQuerySchema,
 } from "@vizaje/contracts";
 import type { EmployeeProfileService } from "../domain/employees/profile-service";
 import type { StoresService } from "../domain/stores/service";
 import type { TrustedPrincipal } from "../domain/authz";
 import { DomainError } from "../domain/errors";
 import type { UsersService } from "../domain/users/service";
+import type { SchedulesService } from "../domain/schedules/service";
 
 export interface ManagementServices {
   users: UsersService;
   stores: StoresService;
   profiles?: EmployeeProfileService;
+  schedules?: SchedulesService;
 }
 
 export type PrincipalResolver = (context: Context) => TrustedPrincipal | null | Promise<TrustedPrincipal | null>;
@@ -58,6 +68,12 @@ function requireProfiles(services: ManagementServices | undefined): EmployeeProf
   const profileService = requireServices(services).profiles;
   if (!profileService) throw new Error("Employee profile services are not configured");
   return profileService;
+}
+
+function requireSchedules(services: ManagementServices | undefined): SchedulesService {
+  const scheduleService = requireServices(services).schedules;
+  if (!scheduleService) throw new Error("Schedule services are not configured");
+  return scheduleService;
 }
 
 export function registerManagementRoutes(
@@ -180,5 +196,73 @@ export function registerManagementRoutes(
     const principal = await requirePrincipal(resolvePrincipal, context);
     const result = await requireServices(services).stores.setStoreActive(principal, parseId(context.req.param("id"), "Store"), false);
     return context.json(result, 200);
+  });
+
+  app.get("/api/v1/management/schedules", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    const query = parseInput(scheduleListQuerySchema, context.req.query());
+    return context.json(await requireSchedules(services).list(principal, query), 200);
+  });
+
+  app.post("/api/v1/management/schedules", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await requireSchedules(services).create(principal, parseInput(schedulePeriodCreateSchema, await parseJson(context))), 201);
+  });
+
+  app.get("/api/v1/management/schedules/:id", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await requireSchedules(services).get(principal, parseId(context.req.param("id"), "Schedule")), 200);
+  });
+
+  app.patch("/api/v1/management/schedules/:id", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await requireSchedules(services).update(principal, parseId(context.req.param("id"), "Schedule"), parseInput(schedulePeriodUpdateSchema, await parseJson(context))), 200);
+  });
+
+  app.post("/api/v1/management/schedules/:id/revise", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await requireSchedules(services).revise(principal, parseId(context.req.param("id"), "Schedule")), 201);
+  });
+
+  app.post("/api/v1/management/schedules/:id/publish", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await requireSchedules(services).publish(principal, parseId(context.req.param("id"), "Schedule")), 200);
+  });
+
+  app.get("/api/v1/management/schedules/:id/history", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await requireSchedules(services).history(principal, parseId(context.req.param("id"), "Schedule")), 200);
+  });
+
+  app.post("/api/v1/management/schedules/:id/shifts", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await requireSchedules(services).addShift(principal, parseId(context.req.param("id"), "Schedule"), parseInput(scheduleShiftCreateSchema, await parseJson(context))), 201);
+  });
+  app.patch("/api/v1/management/schedules/:id/shifts/:shiftId", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await requireSchedules(services).updateShift(principal, parseId(context.req.param("id"), "Schedule"), parseId(context.req.param("shiftId"), "Shift"), parseInput(scheduleShiftUpdateSchema, await parseJson(context))), 200);
+  });
+  app.delete("/api/v1/management/schedules/:id/shifts/:shiftId", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await requireSchedules(services).removeShift(principal, parseId(context.req.param("id"), "Schedule"), parseId(context.req.param("shiftId"), "Shift")), 200);
+  });
+  app.post("/api/v1/management/schedules/:id/days-off", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await requireSchedules(services).addDayOff(principal, parseId(context.req.param("id"), "Schedule"), parseInput(scheduleDayOffCreateSchema, await parseJson(context))), 201);
+  });
+  app.patch("/api/v1/management/schedules/:id/days-off/:dayOffId", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await requireSchedules(services).updateDayOff(principal, parseId(context.req.param("id"), "Schedule"), parseId(context.req.param("dayOffId"), "Day off"), parseInput(scheduleDayOffUpdateSchema, await parseJson(context))), 200);
+  });
+  app.delete("/api/v1/management/schedules/:id/days-off/:dayOffId", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    return context.json(await requireSchedules(services).removeDayOff(principal, parseId(context.req.param("id"), "Schedule"), parseId(context.req.param("dayOffId"), "Day off")), 200);
+  });
+
+  app.get("/api/v1/me/schedule", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    const today = new Date().toISOString().slice(0, 10);
+    const query = parseInput(staffScheduleQuerySchema, { from: context.req.query("from") ?? today, to: context.req.query("to") ?? today });
+    return context.json(await requireSchedules(services).staffSchedule(principal, query), 200);
   });
 }

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { Camera, ClipboardCheck, ShieldCheck, UserRound } from 'lucide-react-native'
+import { CalendarDays, Camera, ClipboardCheck, ShieldCheck, UserRound } from 'lucide-react-native'
 import { useMemo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { useAuth } from '../../src/auth/auth-context'
@@ -23,7 +23,7 @@ export default function HomeScreen() {
 	return <Screen>
 		<View style={styles.headerRow}><View style={styles.headerCopy}><Text style={[styles.title, { color: colors.text }]}>{greetingText}, {user?.firstName ?? 'коллега'}</Text></View><IconAction icon={UserRound} label="Открыть профиль" onPress={() => router.push('/profile')} /></View>
 
-		<View style={styles.actions}><ActionButton label="Открыть тесты" icon={ClipboardCheck} onPress={() => router.push('/(tabs)/quizzes')} /><ActionButton label="Добавить фото" icon={Camera} variant="secondary" onPress={() => router.push('/(tabs)/photos')} /></View>
+		<View style={styles.actions}><ActionButton label="Открыть тесты" icon={ClipboardCheck} onPress={() => router.push('/(tabs)/quizzes')} /><ActionButton label="Открыть расписание" icon={CalendarDays} variant="secondary" onPress={() => router.push('/schedule')} /><ActionButton label="Добавить фото" icon={Camera} variant="secondary" onPress={() => router.push('/(tabs)/photos')} /></View>
 
 		<SectionTitle>Сегодня</SectionTitle>
 		<View style={[styles.statusRow, { backgroundColor: colors.surfaceRaised }]}><View style={[styles.statusIcon, { backgroundColor: colors.accentSoft }]}><ShieldCheck color={colors.accent} size={21} /></View><View style={styles.statusCopy}><Text style={[styles.statusTitle, { color: colors.text }]}>Сессия активна</Text><Text style={[styles.statusBody, { color: colors.muted }]}>{storeCount ? `${storeCount} ${storeCount === 1 ? 'магазин доступен' : 'магазина доступны'} для работы.` : 'Назначенные магазины появятся после настройки профиля.'}</Text></View></View>
