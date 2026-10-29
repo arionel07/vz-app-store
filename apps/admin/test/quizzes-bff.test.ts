@@ -3,6 +3,8 @@ import { GET as getQuizzes, POST as createQuiz } from '../src/app/api/admin/quiz
 import { PUT as saveDraft } from '../src/app/api/admin/quizzes/[id]/draft/route'
 import { POST as publishQuiz } from '../src/app/api/admin/quizzes/[id]/publish/route'
 import { GET as getResults } from '../src/app/api/admin/quizzes/[id]/results/route'
+import { GET as getReviews } from '../src/app/api/admin/quiz-reviews/route'
+import { POST as reviewAnswer } from '../src/app/api/admin/quiz-reviews/[attemptId]/questions/[questionId]/route'
 
 const originalFetch = globalThis.fetch
 const quizId = '00000000-0000-4000-8000-000000000001'
@@ -96,5 +98,26 @@ describe('quiz management BFF', () => {
 
 		const invalidId = await getResults(request('/api/admin/quizzes/not-a-uuid/results'), { params: Promise.resolve({ id: 'not-a-uuid' }) })
 		expect(invalidId.status).toBe(400)
+	})
+
+	test('keeps manual review routes explicit and CSRF-protected', async () => {
+		process.env.VIZAJE_API_URL = 'http://127.0.0.1:3000'
+		const attemptId = '00000000-0000-4000-8000-000000000005'
+		const questionId = '00000000-0000-4000-8000-000000000006'
+		let target = ''
+		let captured: RequestInit | undefined
+		globalThis.fetch = (async (input, init) => {
+			target = String(input)
+			captured = init
+			if (init?.method === 'POST') return upstream(200, { attemptId, questionId, status: 'reviewed', awardedPoints: 2, maxPoints: 3, reviewerId: userId, feedback: null, reviewedAt: '2026-01-01T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' })
+			return upstream(200, { data: [{ attemptId, questionId, status: 'pending', awardedPoints: null, maxPoints: 3, reviewerId: null, feedback: null, reviewedAt: null, createdAt: '2026-01-01T00:00:00.000Z', userId, userName: 'Тест Сотрудник', quizId, questionPrompt: 'Текст' }], pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 } })
+		}) as typeof fetch
+		const list = await getReviews(request('/api/admin/quiz-reviews?status=pending', { headers: { cookie: 'vizaje_session=session' } }))
+		expect(list.status).toBe(200)
+		expect(target).toContain('/api/v1/management/quiz-reviews?')
+		const reviewed = await reviewAnswer(request(`/api/admin/quiz-reviews/${attemptId}/questions/${questionId}`, { method: 'POST', headers: { cookie: 'vizaje_session=session; vizaje_csrf=csrf', 'x-csrf-token': 'csrf' }, body: JSON.stringify({ awardedPoints: 2, feedback: null }) }), { params: Promise.resolve({ attemptId, questionId }) })
+		expect(reviewed.status).toBe(200)
+		expect(target).toContain(`/api/v1/management/quiz-attempts/${attemptId}/questions/${questionId}/review`)
+		expect(new Headers(captured?.headers).get('x-csrf-token')).toBe('csrf')
 	})
 })

@@ -284,6 +284,28 @@ export async function uploadPhoto(token: string, storeId: string, file: PhotoUpl
 	}
 }
 
+export async function uploadQuizAnswerPhoto(token: string, attemptId: string, questionId: string, file: PhotoUploadFile, idempotencyKey: string): Promise<PhotoResponse> {
+	const form = new FormData()
+	form.append('file', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob)
+	try {
+		const response = await fetch(`${apiOrigin()}/api/v1/attempts/${encodeURIComponent(attemptId)}/questions/${encodeURIComponent(questionId)}/photo`, {
+			method: 'POST',
+			headers: { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Idempotency-Key': idempotencyKey },
+			body: form,
+			credentials: 'omit',
+		})
+		let body: unknown = null
+		try { body = await response.json() } catch { body = null }
+		if (!response.ok) throw requestError(response.status, body)
+		const parsed = photoResponseSchema.safeParse(body)
+		if (!parsed.success) throw new ApiError(502, 'INVALID_API_RESPONSE', 'Сервер вернул некорректный ответ')
+		return parsed.data
+	} catch (error) {
+		if (error instanceof ApiError) throw error
+		throw new ApiError(0, 'NETWORK_UNAVAILABLE', 'Сервис временно недоступен')
+	}
+}
+
 export async function resubmitPhotoReport(token: string, reportId: string, file: PhotoUploadFile, idempotencyKey: string): Promise<PhotoReviewMutationResponse> {
 	const form = new FormData()
 	form.append('file', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob)

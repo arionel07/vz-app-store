@@ -1,21 +1,27 @@
 import type { Context, Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import {
   attemptListQuerySchema,
   quizCreateInputSchema,
   quizDraftInputSchema,
   quizListQuerySchema,
+  quizReviewInputSchema,
+  quizReviewListQuerySchema,
   submitAttemptInputSchema,
 } from "@vizaje/contracts";
 import type { TrustedPrincipal } from "../domain/authz";
 import { DomainError } from "../domain/errors";
 import type { QuizAttemptService } from "../domain/quizzes/attempt-service";
+import type { PhotosService } from "../domain/photos/service";
 import type { QuizService } from "../domain/quizzes/service";
 import type { PrincipalResolver } from "./management";
 
 export interface QuizRoutesOptions {
   quizzes: QuizService;
   attempts: QuizAttemptService;
+  photos?: PhotosService;
+  maxUploadBytes?: number;
   resolvePrincipal: PrincipalResolver;
 }
 
@@ -33,6 +39,18 @@ async function parseJson(context: Context): Promise<unknown> {
   }
 }
 
+async function parsePhotoFile(context: Context): Promise<File> {
+  let form: FormData;
+  try {
+    form = await context.req.formData();
+  } catch {
+    throw new DomainError(400, "INVALID_MULTIPART", "Request must be multipart/form-data");
+  }
+  const files = form.getAll("file");
+  if (files.length !== 1 || !(files[0] instanceof File)) throw new DomainError(400, "PHOTO_REQUIRED", "Exactly one file field is required");
+  return files[0];
+}
+
 async function requirePrincipal(resolvePrincipal: PrincipalResolver, context: Context): Promise<TrustedPrincipal> {
   const principal = await resolvePrincipal(context);
   if (!principal) throw new DomainError(401, "UNAUTHENTICATED", "Authentication is required");
@@ -44,7 +62,7 @@ function idParam(context: Context, name: string): string {
 }
 
 export function registerQuizRoutes(app: Hono, options: QuizRoutesOptions): void {
-  const { quizzes, attempts, resolvePrincipal } = options;
+  const { quizzes, attempts, photos, resolvePrincipal, maxUploadBytes = 10 * 1024 * 1024 } = options;
 
   app.post("/api/v1/management/quizzes", async (context) => {
     const principal = await requirePrincipal(resolvePrincipal, context);
@@ -86,6 +104,18 @@ export function registerQuizRoutes(app: Hono, options: QuizRoutesOptions): void 
     return context.json(await attempts.listResults(principal, query), 200);
   });
 
+  app.get("/api/v1/management/quiz-reviews", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    const query = parseInput(quizReviewListQuerySchema, context.req.query());
+    return context.json(await attempts.listReviews(principal, query), 200);
+  });
+
+  app.post("/api/v1/management/quiz-attempts/:attemptId/questions/:questionId/review", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    const input = parseInput(quizReviewInputSchema, await parseJson(context));
+    return context.json(await attempts.review(principal, idParam(context, "attemptId"), idParam(context, "questionId"), input), 200);
+  });
+
   app.get("/api/v1/quizzes", async (context) => {
     const principal = await requirePrincipal(resolvePrincipal, context);
     const query = parseInput(quizListQuerySchema, context.req.query());
@@ -106,6 +136,17 @@ export function registerQuizRoutes(app: Hono, options: QuizRoutesOptions): void 
     const principal = await requirePrincipal(resolvePrincipal, context);
     const input = parseInput(submitAttemptInputSchema, await parseJson(context));
     return context.json(await attempts.submit(principal, idParam(context, "id"), input), 200);
+  });
+
+  if (photos) app.post("/api/v1/attempts/:attemptId/questions/:questionId/photo", bodyLimit({ maxSize: maxUploadBytes + 64 * 1024, onError: (context) => context.json({ error: { code: "PHOTO_TOO_LARGE", message: "Photo exceeds the maximum allowed size" } }, 413) }), async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    const attemptId = idParam(context, "attemptId");
+    const questionId = idParam(context, "questionId");
+    const file = await parsePhotoFile(context);
+    const storeId = await attempts.photoStoreId(principal, attemptId, questionId);
+    const uploaded = await photos.uploadQuizAnswer(principal, storeId, file, context.req.header("Idempotency-Key"));
+    await attempts.attachPhoto(principal, attemptId, questionId, uploaded.photo.id);
+    return context.json(uploaded.photo, uploaded.created ? 201 : 200);
   });
 
   app.get("/api/v1/attempts", async (context) => {

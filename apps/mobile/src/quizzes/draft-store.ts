@@ -1,5 +1,5 @@
 import { submitAttemptInputSchema, type SubmitAttemptInput } from '@vizaje/contracts'
-import type { AnswerMap } from './model'
+import { selectedOptionIds, type AnswerMap } from './model'
 
 const DRAFT_KEY_PREFIX = 'vizaje.quiz.draft.'
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -45,7 +45,12 @@ export function createAttemptDraftStore(storage: DraftStorage) {
 			return draft
 		},
 		async save(attemptId: string, quizId: string, revisionId: string, answers: AnswerMap, questionIds: string[]): Promise<void> {
-			const input: SubmitAttemptInput = { answers: questionIds.map((questionId) => ({ questionId, optionId: answers[questionId] ?? null })) }
+			const input: SubmitAttemptInput = { answers: questionIds.map((questionId) => {
+				const value = answers[questionId]
+				const rich = typeof value === 'object' && value !== null && !Array.isArray(value) ? value : {}
+				const optionIds = selectedOptionIds(value ?? null)
+				return { questionId, optionId: optionIds[0] ?? null, optionIds, textAnswer: rich.textAnswer ?? null, rating: rich.rating ?? null, photoId: rich.photoId ?? null }
+			}) }
 			const validated = submitAttemptInputSchema.parse(input)
 			await storage.setItem(draftKey(attemptId), JSON.stringify({ attemptId, quizId, revisionId, answers: validated, updatedAt: new Date().toISOString() }))
 		},
@@ -57,5 +62,9 @@ export function createAttemptDraftStore(storage: DraftStorage) {
 
 export function answerMapFromDraft(draft: AttemptDraft | null): AnswerMap {
 	if (!draft) return {}
-	return Object.fromEntries(draft.answers.answers.map((answer) => [answer.questionId, answer.optionId]))
+	return Object.fromEntries(draft.answers.answers.map((answer) => {
+		const optionIds = answer.optionIds ?? (answer.optionId ? [answer.optionId] : [])
+		const value = answer.textAnswer || answer.rating !== null || answer.photoId ? { optionIds, textAnswer: answer.textAnswer, rating: answer.rating, photoId: answer.photoId } : optionIds.length > 1 ? optionIds : answer.optionId
+		return [answer.questionId, value ?? null]
+	}))
 }

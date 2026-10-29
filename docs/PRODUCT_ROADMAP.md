@@ -139,7 +139,7 @@ There are no tests for the future modules described below because those modules 
 | Dashboard aggregates | Implemented | Extend only after event/status definitions are stable |
 | Employee HR profile | Implemented | Milestone 12 is complete; profile media remains deferred |
 | Photo review and resubmission | Implemented | Milestone 13 is complete on the SDK 58 upgrade branch |
-| Advanced quiz engine | Not implemented | Milestone 14 |
+| Advanced quiz engine | Implemented | Milestone 14 |
 | Work schedules | Not implemented | Milestone 15 |
 | Tasks/checklists | Not implemented | Milestone 16 |
 | In-app/push notifications and announcements | Not implemented | Milestone 17 |
@@ -473,6 +473,8 @@ Dependencies: immutable revision behavior and assignment scope; event/outbox con
 - **Automated tests:** Every scoring rule, partial credit, survey non-scoring, deadlines, limits, randomization reproducibility, historical results, manual review, staff answer redaction, and cross-store assignment.
 - **Acceptance criteria:** Published revisions cannot change; old attempts retain old semantics; all listed question types have explicit behavior; survey results do not affect exam scores; staff APIs never leak answers or scoring internals.
 
+Status: implemented on the SDK 58 upgrade branch. The additive `0011_advanced_quiz_engine` migration stores assessment settings, question configuration, assignment targets, persisted attempt order, typed answer payloads, manual-review state, review history, and private photo-answer references. The API owns deterministic scoring, attempt limits/deadlines, role/store/user eligibility checks, and transactional `quiz.*` domain events. Admin authoring exposes modes, limits, randomization, typed questions, store/role assignment, and a scoped review queue. Mobile renders choice, text, rating, and photo-answer flows while keeping scoring data server-side. Individual-user assignment storage is supported by the shared contract and API; the current Admin editor exposes store and role targets, with individual targeting remaining an API-level capability.
+
 ### Milestone 15 — Work schedules
 
 Dependencies: employee profiles, store timezone decisions, current memberships and authorization.
@@ -609,4 +611,4 @@ These questions should be answered before implementation of the corresponding mi
 
 The current repository is not missing a backend foundation; it has a working identity/store/authentication layer, private photo storage, revisioned quizzes, results, dashboard aggregates, and explicit Admin/Mobile clients. The future work is additive domain expansion.
 
-Milestones 12 and 13 address the largest current data-model gaps and establish reusable profile, review, audit, and event conventions before schedules, tasks, notifications, and reporting are added. Milestone 14 remains the next planned product milestone and is intentionally out of scope here.
+Milestones 12–14 address employee profiles, photo review, and the advanced revisioned quiz engine. Schedules, tasks, notifications, knowledge base, retail operations, and advanced reporting remain future milestones.

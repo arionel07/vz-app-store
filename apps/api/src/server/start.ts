@@ -44,6 +44,8 @@ export function startServer() {
     quizRoutes: {
       quizzes,
       attempts,
+      photos,
+      maxUploadBytes: env.PHOTO_MAX_BYTES,
       resolvePrincipal: auth.principalResolver(),
     },
     photoRoutes: {

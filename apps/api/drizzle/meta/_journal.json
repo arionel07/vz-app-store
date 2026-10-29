@@ -78,6 +78,13 @@
       "when": 1793319300000,
       "tag": "0010_photo_review_idempotency",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793320000000,
+      "tag": "0011_advanced_quiz_engine",
+      "breakpoints": true
     }
   ]
 }

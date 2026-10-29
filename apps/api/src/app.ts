@@ -57,6 +57,12 @@ export function createApp({
     }),
   );
 
+  app.use("/api/v1/*", async (context, next) => {
+    await next();
+    context.header("Cache-Control", "private, no-store");
+    context.header("Vary", "Authorization, Cookie");
+  });
+
   app.get("/health", (context) => {
     const response = livenessResponseSchema.parse({
       status: "ok",

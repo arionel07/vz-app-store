@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { getAvailableQuiz, getCurrentUser, getMyProfile, listAvailableQuizzes, listMyAttempts, mobileLogin, redeemActivation, resolveApiOrigin, startQuizAttempt, submitQuizAttempt, uploadPhoto } from '../src/api/client'
+import { getAvailableQuiz, getCurrentUser, getMyProfile, listAvailableQuizzes, listMyAttempts, mobileLogin, redeemActivation, resolveApiOrigin, startQuizAttempt, submitQuizAttempt, uploadPhoto, uploadQuizAnswerPhoto } from '../src/api/client'
 import { mobileLoginErrorMessage } from '../src/auth/login-errors'
 
 process.env.EXPO_PUBLIC_API_URL ??= 'http://127.0.0.1:3000'
@@ -206,5 +206,15 @@ describe('mobile API client', () => {
 		}) as unknown as typeof fetch
 		await expect(uploadPhoto('access-token', photo.storeId, { uri: 'file:///photo.jpg', name: 'photo.jpg', type: 'image/jpeg' }, 'photo-key-2')).rejects.toMatchObject({ status: 503 })
 		expect(calls).toBe(1)
+	})
+
+	test('uploads a quiz answer photo through its explicit attempt route', async () => {
+		globalThis.fetch = (async (input, init) => {
+			expect(String(input)).toContain(`/api/v1/attempts/${attempt.id}/questions/${quiz.questions[0].id}/photo`)
+			expect(init?.headers).toMatchObject({ Authorization: 'Bearer access-token', 'Idempotency-Key': 'quiz-photo-key' })
+			expect(init?.body).toBeInstanceOf(FormData)
+			return new Response(JSON.stringify(photo), { status: 201 })
+		}) as typeof fetch
+		expect(await uploadQuizAnswerPhoto('access-token', attempt.id, quiz.questions[0].id, { uri: 'file:///answer.jpg', name: 'answer.jpg', type: 'image/jpeg' }, 'quiz-photo-key')).toEqual(photo)
 	})
 })

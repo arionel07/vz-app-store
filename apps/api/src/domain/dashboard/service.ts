@@ -91,6 +91,7 @@ function completedAttemptsCte(scope: DashboardScope, period: ReportingPeriod): S
         AND "a"."submitted_at" < ${timestampParam(period.end)}
         AND "u"."is_active" = true
         AND "qr"."status" IN ('published', 'archived')
+        AND "qr"."assessment_mode" = 'exam'
         AND ${attemptScopePredicate(scope)}
     )
   `;

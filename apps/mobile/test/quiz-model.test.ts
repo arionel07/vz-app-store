@@ -28,4 +28,11 @@ describe('quiz taking model', () => {
 		expect(progressPercent(1, 2)).toBe(100)
 		expect(progressPercent(0, 0)).toBe(0)
 	})
+
+	test('serializes multiple choice, text and rating answers', () => {
+		const richQuiz = { ...quiz, questions: [{ ...quiz.questions[0], type: 'multiple_choice' as const }, { ...quiz.questions[1], type: 'free_text' as const }] }
+		const input = toSubmissionInput(richQuiz, { [richQuiz.questions[0].id]: [richQuiz.questions[0].options[0].id, richQuiz.questions[0].options[1].id], [richQuiz.questions[1].id]: { textAnswer: 'Ответ' } })
+		expect(input.answers[0]).toMatchObject({ optionIds: [richQuiz.questions[0].options[0].id, richQuiz.questions[0].options[1].id] })
+		expect(input.answers[1]).toMatchObject({ textAnswer: 'Ответ', optionIds: [] })
+	})
 })

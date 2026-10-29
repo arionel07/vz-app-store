@@ -67,6 +67,7 @@ suite("Quiz Engine PostgreSQL integration", () => {
   let storeAId: string;
   let storeBId: string;
   let quizId: string;
+  let advancedQuizId: string;
   let firstAttemptId: string;
   let managerToken: string;
   let staffAToken: string;
@@ -159,6 +160,7 @@ suite("Quiz Engine PostgreSQL integration", () => {
       await db.delete(quizAttempts).where(inArray(quizAttempts.userId, [staffAId, staffBId]));
     }
     if (quizId) await db.delete(quizzes).where(eq(quizzes.id, quizId));
+    if (advancedQuizId) await db.delete(quizzes).where(eq(quizzes.id, advancedQuizId));
     if (managerId && staffAId && staffBId) await db.delete(users).where(inArray(users.id, [managerId, staffAId, staffBId]));
     if (adminId) await db.delete(users).where(eq(users.id, adminId));
     if (storeAId && storeBId) await db.delete(stores).where(inArray(stores.id, [storeAId, storeBId]));
@@ -423,5 +425,59 @@ suite("Quiz Engine PostgreSQL integration", () => {
     expect(results[1].id).toBe(first.id);
     await db.delete(quizAttempts).where(eq(quizAttempts.id, first.id));
     await db.delete(quizzes).where(eq(quizzes.id, rejected.id));
+  });
+
+  test("supports typed questions, manual review, persisted settings, and attempt limits", async () => {
+    const createResponse = await app.request("/api/v1/management/quizzes", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${managerToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Advanced quiz",
+        passingScore: 50,
+        assignmentMode: "selected",
+        storeIds: [storeAId],
+        assessmentMode: "exam",
+        maxAttempts: 1,
+        timeLimitSeconds: 300,
+        randomizeQuestions: true,
+        randomizeOptions: true,
+        showResults: true,
+        questions: [
+          { prompt: "Выберите варианты", position: 0, type: "multiple_choice", maxPoints: 4, scoringPolicy: "partial_credit", options: [{ label: "Да", position: 0, isCorrect: true }, { label: "Нет", position: 1, isCorrect: true }, { label: "Не знаю", position: 2, isCorrect: false }] },
+          { prompt: "Объясните решение", position: 1, type: "free_text", maxPoints: 2, options: [] },
+        ],
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    advancedQuizId = (await responseJson(createResponse)).id;
+    const publishResponse = await app.request(`/api/v1/management/quizzes/${advancedQuizId}/publish`, { method: "POST", headers: { Authorization: `Bearer ${managerToken}` } });
+    expect(publishResponse.status).toBe(200);
+
+    const staffQuizResponse = await app.request(`/api/v1/quizzes/${advancedQuizId}`, { headers: { Authorization: `Bearer ${staffAToken}` } });
+    const staffQuiz = await responseJson(staffQuizResponse);
+    expect(staffQuiz.assessmentMode).toBe("exam");
+    expect(JSON.stringify(staffQuiz)).not.toContain("isCorrect");
+    expect(JSON.stringify(staffQuiz)).not.toContain("points");
+
+    const startResponse = await app.request(`/api/v1/quizzes/${advancedQuizId}/attempts`, { method: "POST", headers: { Authorization: `Bearer ${staffAToken}` } });
+    expect(startResponse.status).toBe(201);
+    const started = await responseJson(startResponse);
+    const multiple = started.quiz.questions.find((question: { type: string }) => question.type === "multiple_choice");
+    const freeText = started.quiz.questions.find((question: { type: string }) => question.type === "free_text");
+    const submitResponse = await app.request(`/api/v1/attempts/${started.id}/submit`, { method: "POST", headers: { Authorization: `Bearer ${staffAToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ answers: [{ questionId: multiple.id, optionIds: [multiple.options[0].id] }, { questionId: freeText.id, textAnswer: "Потому что это безопасно" }] }) });
+    expect(submitResponse.status).toBe(200);
+    expect((await responseJson(submitResponse)).reviewStatus).toBe("pending");
+
+    const reviewQueue = await app.request(`/api/v1/management/quiz-reviews?quizId=${advancedQuizId}`, { headers: { Authorization: `Bearer ${managerToken}` } });
+    expect(reviewQueue.status).toBe(200);
+    const pending = await responseJson(reviewQueue);
+    expect(pending.data).toHaveLength(1);
+    const review = await app.request(`/api/v1/management/quiz-attempts/${started.id}/questions/${freeText.id}/review`, { method: "POST", headers: { Authorization: `Bearer ${managerToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ awardedPoints: 2, feedback: "Хорошо" }) });
+    expect(review.status).toBe(200);
+    const completed = await app.request(`/api/v1/attempts/${started.id}`, { headers: { Authorization: `Bearer ${staffAToken}` } });
+    expect((await responseJson(completed)).reviewStatus).toBe("completed");
+    const limited = await app.request(`/api/v1/quizzes/${advancedQuizId}/attempts`, { method: "POST", headers: { Authorization: `Bearer ${staffAToken}` } });
+    expect(limited.status).toBe(409);
+    expect((await responseJson(limited)).error.code).toBe("ATTEMPT_LIMIT_REACHED");
   });
 });

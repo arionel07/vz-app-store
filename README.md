@@ -96,7 +96,7 @@ Browser sessions use HttpOnly SameSite cookies plus a separate CSRF token header
 
 ## Quiz Engine
 
-Quiz authoring and participation are API-only in this milestone; no admin or mobile UI is included.
+The quiz engine supports immutable published revisions and eight typed question formats: single choice, multiple choice, weighted choice, free text, opinion, rating, scenario, and photo answer. Revisions can run as an exam, practice, or non-scoring survey. Legacy single-choice payloads remain valid.
 
 Authoring routes require an authenticated admin or manager:
 
@@ -106,17 +106,20 @@ Authoring routes require an authenticated admin or manager:
 - `POST /api/v1/management/quizzes/:id/publish` validates and publishes the draft.
 - `POST /api/v1/management/quizzes/:id/archive` archives the quiz.
 - `GET /api/v1/management/quizzes/:id/results` returns scoped attempt results without answers or correct-option data.
+- `GET /api/v1/management/quiz-reviews` lists scoped free-text/photo answers awaiting manual review.
+- `POST /api/v1/management/quiz-attempts/:attemptId/questions/:questionId/review` awards a bounded manual score and records review history.
 
 Staff routes require an authenticated active staff principal:
 
 - `GET /api/v1/quizzes` and `GET /api/v1/quizzes/:id` list/open published quizzes available through active store memberships.
 - `POST /api/v1/quizzes/:id/attempts` starts one active attempt per user and revision.
 - `POST /api/v1/attempts/:id/submit` validates answers and computes the score server-side.
+- `POST /api/v1/attempts/:attemptId/questions/:questionId/photo` uploads a private photo answer for the active attempt.
 - `GET /api/v1/attempts` and `GET /api/v1/attempts/:id` expose only the current user's attempts.
 
-Quiz data is split across `quizzes`, immutable `quiz_revisions`, `quiz_questions`, `quiz_options`, `quiz_assignments`, `quiz_attempts`, and `quiz_attempt_answers`. Publishing freezes a revision. Editing a published quiz creates the next draft revision, so prior attempts retain their exact question and option IDs. A new attempt cannot be started after archive, while an already-started attempt may be submitted and viewed historically; this keeps in-progress work deterministic without changing past scores.
+Quiz data is split across `quizzes`, immutable `quiz_revisions`, `quiz_questions`, `quiz_options`, `quiz_assignments`, `quiz_assignment_targets`, `quiz_attempts`, `quiz_attempt_answers`, and review history tables. Publishing freezes a revision. Editing a published quiz creates the next draft revision, so prior attempts retain their exact question and option IDs. Attempt limits, availability windows, deadlines, time limits, and persisted randomization orders are enforced by the API. A new attempt cannot be started after archive, while an already-started attempt may be submitted and viewed historically; this keeps in-progress work deterministic without changing past scores.
 
-Managers may only author selected-store quizzes inside their trusted active store scope. Global assignments are administrator-only. Staff responses never include `isCorrect`; results are calculated from the published revision in a transaction protected by a row lock, and repeated submissions return the stored result.
+Managers may only author selected-store quizzes inside their trusted active store scope. Global assignments are administrator-only. Staff responses never include `isCorrect`, option weights, or hidden explanations. Multiple-choice partial credit uses `floor(maxPoints * correctSelected / correctCount) - ceil(maxPoints * wrongSelected / wrongOptionCount)`, clamped to zero and the question maximum. Free-text and photo answers remain pending until an authorized reviewer awards points. Practice attempts are excluded from dashboard exam metrics; surveys do not produce a pass/fail score. Results are calculated from the published revision in a transaction protected by a row lock, and repeated submissions return the stored result.
 
 The PostgreSQL-backed quiz integration tests are opt-in because they require the local Compose database:
 

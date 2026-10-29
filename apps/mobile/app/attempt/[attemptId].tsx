@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { CheckCircle2, RotateCcw, XCircle } from 'lucide-react-native'
+import { CheckCircle2, LoaderCircle, RotateCcw, XCircle } from 'lucide-react-native'
 import { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { ApiError, getMyAttempt, startQuizAttempt } from '../../src/api/client'
@@ -63,11 +63,12 @@ export default function AttemptResultScreen() {
 
 	const quiz = attempt.quiz
 	const isSubmitted = attempt.status === 'submitted'
+	const needsReview = attempt.reviewStatus === 'pending'
 	const passed = attempt.passed === true
 
 	return <Screen>
 		<ScreenHeader title={isSubmitted ? 'Результат' : 'Незавершённый тест'} back backFallback="/(tabs)/quizzes" />
-		{isSubmitted ? <Card style={styles.resultCard}><View style={[styles.resultIcon, { backgroundColor: passed ? colors.accentSoft : colors.surfaceRaised }]}>{passed ? <CheckCircle2 color={colors.success} size={34} /> : <XCircle color={colors.danger} size={34} />}</View><Text style={[styles.resultTitle, { color: colors.text }]}>{passed ? 'Тест пройден' : 'Тест не пройден'}</Text><Text style={[styles.score, { color: passed ? colors.success : colors.danger }]}>{attempt.scorePercent ?? 0}%</Text><View style={[styles.details, { borderTopColor: colors.border }]}><Text style={[styles.detail, { color: colors.muted }]}>Ревизия {attempt.revisionNumber}</Text><Text style={[styles.detail, { color: colors.muted }]}>{dateText(attempt.submittedAt ?? attempt.startedAt)}</Text></View></Card> : <InlineMessage title="Попытка не завершена" body="Вы можете продолжить отвечать на вопросы с сохранённого места." actionLabel="Продолжить" onAction={() => router.replace({ pathname: '/quiz/[id]/attempt', params: { id: attempt.quizId, attemptId: attempt.id } })} />}
+		{isSubmitted ? <Card style={styles.resultCard}><View style={[styles.resultIcon, { backgroundColor: needsReview ? colors.surfaceRaised : passed ? colors.accentSoft : colors.surfaceRaised }]}>{needsReview ? <LoaderCircle color={colors.muted} size={34} /> : passed ? <CheckCircle2 color={colors.success} size={34} /> : <XCircle color={colors.danger} size={34} />}</View><Text style={[styles.resultTitle, { color: colors.text }]}>{needsReview ? 'Ответы проверяются' : passed ? 'Тест пройден' : 'Тест не пройден'}</Text>{needsReview ? <Text style={[styles.detail, { color: colors.muted }]}>Свободные ответы и фотографии проверит менеджер. Итоговый балл появится после проверки.</Text> : <Text style={[styles.score, { color: passed ? colors.success : colors.danger }]}>{attempt.scorePercent ?? 0}%</Text>}<View style={[styles.details, { borderTopColor: colors.border }]}><Text style={[styles.detail, { color: colors.muted }]}>Ревизия {attempt.revisionNumber}</Text><Text style={[styles.detail, { color: colors.muted }]}>{dateText(attempt.submittedAt ?? attempt.startedAt)}</Text></View></Card> : <InlineMessage title="Попытка не завершена" body="Вы можете продолжить отвечать на вопросы с сохранённого места." actionLabel="Продолжить" onAction={() => router.replace({ pathname: '/quiz/[id]/attempt', params: { id: attempt.quizId, attemptId: attempt.id } })} />}
 		{error && <InlineMessage title="Не удалось начать новую попытку" body={error} actionLabel="Повторить" onAction={() => void retry()} />}
 		{isSubmitted && <ActionButton label={retrying ? 'Готовим новую попытку…' : 'Пройти ещё раз'} icon={RotateCcw} disabled={retrying} variant="secondary" onPress={() => void retry()} />}
 		<ActionButton label="Вернуться к тестам" variant={isSubmitted ? 'quiet' : 'secondary'} onPress={() => router.replace('/(tabs)/quizzes')} />

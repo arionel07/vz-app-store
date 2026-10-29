@@ -16,6 +16,8 @@ const MANAGEMENT_API_PREFIXES = [
 	'/api/v1/users',
 	'/api/v1/stores',
 	'/api/v1/management/quizzes',
+	'/api/v1/management/quiz-reviews',
+	'/api/v1/management/quiz-attempts',
 	'/api/v1/photos',
 	'/api/v1/photo-reports',
 	'/api/v1/dashboard/overview',

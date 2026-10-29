@@ -5,11 +5,14 @@ import { ChevronLeft, ChevronRight, ClipboardCheck, LoaderCircle, RefreshCw, Sea
 import { toast } from 'sonner'
 import {
 	quizListResponseSchema,
+	quizReviewListResponseSchema,
+	quizReviewResponseSchema,
 	resultListResponseSchema,
 	userListResponseSchema,
 	type QuizAuthoringResponse,
 	type ResultResponse,
 	type UserResponse,
+	type QuizReviewListResponse,
 } from '@vizaje/contracts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -41,6 +44,8 @@ export function ResultsPage() {
 	const [loadingFilters, setLoadingFilters] = useState(true)
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [reviews, setReviews] = useState<QuizReviewListResponse['data']>([])
+	const [reviewsLoading, setReviewsLoading] = useState(false)
 
 	const quizById = useMemo(() => new Map(quizOptions.map((quiz) => [quiz.id, quiz])), [quizOptions])
 	const selectedQuiz = selectedQuizId ? quizById.get(selectedQuizId) : undefined
@@ -92,8 +97,41 @@ export function ResultsPage() {
 		}
 	}, [page, selectedQuizId, selectedUserId, status])
 
+	const loadReviews = useCallback(async () => {
+		setReviewsLoading(true)
+		try {
+			const query = new URLSearchParams({ page: '1', pageSize: '50', status: 'pending' })
+			if (selectedQuizId) query.set('quizId', selectedQuizId)
+			const response = await managementFetch(`/api/admin/quiz-reviews?${query}`, quizReviewListResponseSchema)
+			setReviews(response.data)
+		} catch (requestError) {
+			if (requestError instanceof ManagementError && requestError.status === 401) window.location.replace('/login')
+			else setError(errorMessage(requestError))
+		} finally {
+			setReviewsLoading(false)
+		}
+	}, [selectedQuizId])
+
+	async function reviewAnswer(review: QuizReviewListResponse['data'][number]) {
+		const value = window.prompt(`Баллы за ответ (0–${review.maxPoints})`, String(review.maxPoints))
+		if (value === null) return
+		const awardedPoints = Number(value)
+		if (!Number.isInteger(awardedPoints) || awardedPoints < 0 || awardedPoints > review.maxPoints) {
+			toast.error('Укажите целое число в допустимом диапазоне')
+			return
+		}
+		try {
+			await managementFetch(`/api/admin/quiz-reviews/${review.attemptId}/questions/${review.questionId}`, quizReviewResponseSchema, { method: 'POST', body: JSON.stringify({ awardedPoints, feedback: null }) })
+			setReviews((current) => current.filter((item) => item.questionId !== review.questionId || item.attemptId !== review.attemptId))
+			toast.success('Ответ проверен')
+		} catch (requestError) {
+			toast.error(errorMessage(requestError))
+		}
+	}
+
 	useEffect(() => { void loadFilters() }, [loadFilters])
 	useEffect(() => { void loadResults() }, [loadResults])
+	useEffect(() => { void loadReviews() }, [loadReviews])
 
 	function changeFilter(change: () => void) {
 		setPage(1)
@@ -106,6 +144,7 @@ export function ResultsPage() {
 			<header className="management-toolbar"><div><p className="eyebrow">Рабочая область</p><h1 className="page-title">Результаты</h1><p className="page-subtitle">Завершённые попытки с сохранением исторических ревизий</p></div><div className="management-toolbar-actions"><Button variant="outline" size="sm" onClick={() => void Promise.all([loadFilters(), loadResults()])} disabled={loading || loadingFilters}><RefreshCw size={14} className={loading || loadingFilters ? 'animate-spin' : ''} />Обновить</Button></div></header>
 			<div className="management-filters results-filters"><label className="sr-only" htmlFor="results-quiz">Квиз</label><Select id="results-quiz" value={selectedQuizId} disabled={loadingFilters} onChange={(event) => changeFilter(() => setSelectedQuizId(event.target.value))}><option value="">Выберите квиз</option>{quizOptions.map((quiz) => <option key={quiz.id} value={quiz.id}>{quiz.title} · v{quiz.revisionNumber}</option>)}</Select><label className="sr-only" htmlFor="results-user">Сотрудник</label><Select id="results-user" value={selectedUserId} onChange={(event) => changeFilter(() => setSelectedUserId(event.target.value))}><option value="">Все сотрудники</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.firstName} {employee.lastName}</option>)}</Select><label className="sr-only" htmlFor="results-status">Статус попытки</label><Select id="results-status" value={status} onChange={(event) => changeFilter(() => setStatus(event.target.value as 'submitted' | 'in_progress' | 'all'))}><option value="submitted">Завершённые</option><option value="in_progress">В процессе</option><option value="all">Все попытки</option></Select><div className="relative results-search"><Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input id="results-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск сотрудника" className="pl-9" /></div></div>
 			{error && <div className="management-error" role="alert">{error}<button type="button" onClick={() => void loadResults()}>Повторить</button></div>}
+			<section className="management-surface mt-3" aria-label="Ответы на ручную проверку"><div className="panel-header"><div><p className="eyebrow">Ручная проверка</p><h2 className="panel-title">Ответы на проверку</h2><p className="panel-description">Свободный текст и фотографии не получают балл автоматически.</p></div><Badge tone={reviews.length ? 'blue' : 'green'}>{reviewsLoading ? 'Загрузка…' : `${reviews.length} ожидают`}</Badge></div>{reviews.length === 0 && !reviewsLoading ? <p className="role-note">Новых ответов на проверку нет.</p> : <div className="quiz-preview">{reviews.map((review) => <div className="quiz-preview-row" key={`${review.attemptId}-${review.questionId}`}><div><strong>{review.userName}</strong><small>{review.questionPrompt}</small>{review.textAnswer && <small>Ответ: {review.textAnswer}</small>}{review.photoId && <small>Прикреплена фотография: {review.photoId}</small>}</div><Button size="sm" onClick={() => void reviewAnswer(review)}>Проверить</Button></div>)}</div>}</section>
 			{!loadingFilters && quizOptions.length === 0 ? <div className="management-surface management-state mt-3"><div><ClipboardCheck className="mx-auto text-muted-foreground" /><strong>Результатов пока нет</strong><p>Сначала создайте и опубликуйте квиз, затем сотрудники смогут пройти его.</p></div></div> : <div className="management-grid mt-3"><section className="management-surface" aria-label="Список результатов">{loading || loadingFilters ? <div className="management-state"><div><LoaderCircle className="mx-auto animate-spin text-muted-foreground" /><p>Загружаем результаты…</p></div></div> : filteredResults.length === 0 ? <div className="management-state"><div><ClipboardCheck className="mx-auto text-muted-foreground" /><strong>Результаты не найдены</strong><p>Измените фильтры или дождитесь завершённых попыток.</p></div></div> : <><table className="management-table"><thead><tr><th>Сотрудник</th><th>Квиз</th><th>Ревизия</th><th>Балл</th><th>Итог</th><th>Отправлено</th></tr></thead><tbody>{filteredResults.map((result) => <tr key={result.attemptId} aria-selected={selected?.attemptId === result.attemptId} onClick={() => setSelected(result)}><td><strong>{result.userName}</strong><small className="result-id">{result.attemptId}</small></td><td>{selectedQuiz?.title ?? 'Квиз'}</td><td>v{result.revisionNumber}</td><td>{result.scorePercent === null ? '—' : `${result.scorePercent}%`}</td><td><Badge tone={result.status !== 'submitted' ? 'blue' : result.passed ? 'green' : 'danger'}>{result.status !== 'submitted' ? 'В процессе' : result.passed ? 'Пройден' : 'Не пройден'}</Badge></td><td className="cell-muted">{result.submittedAt ? formatDate(result.submittedAt) : 'Не отправлено'}</td></tr>)}</tbody></table><div className="management-pagination"><span>{pagination.total === 0 ? 'Нет попыток' : `${(pagination.page - 1) * pagination.pageSize + 1}–${Math.min(pagination.page * pagination.pageSize, pagination.total)} из ${pagination.total}`}</span><div className="management-pagination-actions"><button type="button" aria-label="Предыдущая страница" disabled={page <= 1 || loading} onClick={() => setPage((value) => Math.max(1, value - 1))}><ChevronLeft size={15} /></button><span>{page} / {Math.max(pagination.totalPages, 1)}</span><button type="button" aria-label="Следующая страница" disabled={page >= pagination.totalPages || loading} onClick={() => setPage((value) => value + 1)}><ChevronRight size={15} /></button></div></div></>}</section><aside className="management-surface management-inspector" aria-label="Детали результата">{!selected ? <div className="management-state"><div><ClipboardCheck className="mx-auto text-muted-foreground" /><p>Выберите результат, чтобы увидеть детали попытки.</p></div></div> : <><div className="panel-header"><div><p className="eyebrow">Попытка</p><h2 className="panel-title">{selected.userName}</h2><p className="panel-description">{selectedQuiz?.title ?? 'Квиз'} · версия {selected.revisionNumber}</p></div><Badge tone={selected.passed ? 'green' : selected.status === 'submitted' ? 'danger' : 'blue'}>{selected.status === 'submitted' ? (selected.passed ? 'Пройден' : 'Не пройден') : 'В процессе'}</Badge></div><div className="panel-content"><dl className="management-meta"><div><dt>Балл</dt><dd>{selected.scorePercent === null ? '—' : `${selected.scorePercent}%`}</dd></div><div><dt>Начало</dt><dd>{formatDate(selected.startedAt)}</dd></div><div><dt>Отправлено</dt><dd>{selected.submittedAt ? formatDate(selected.submittedAt) : 'Не отправлено'}</dd></div><div><dt>Идентификатор</dt><dd className="max-w-[180px] truncate">{selected.attemptId}</dd></div></dl><p className="role-note">Ответы и правильные варианты не передаются в management results API. Историческая ревизия результата сохраняется отдельно.</p></div></>}</aside></div>}
 		</div>
 	)

@@ -270,6 +270,50 @@ export class PhotosService {
     }
   }
 
+  /** Stores a private quiz answer image without creating a photo-report review item. */
+  async uploadQuizAnswer(principal: TrustedPrincipal, storeId: string, file: File, requestedIdempotencyKey?: string): Promise<PhotoUploadResult> {
+    await this.assertCanUpload(principal, storeId);
+    const idempotencyKey = requestedIdempotencyKey ? photoIdempotencyKeySchema.parse(requestedIdempotencyKey) : undefined;
+    if (file.size <= 0) throw new DomainError(400, "EMPTY_PHOTO", "Photo file is empty");
+    if (file.size > this.limits.maxBytes) throw new DomainError(413, "PHOTO_TOO_LARGE", "Photo exceeds the maximum allowed size");
+    const input = new Uint8Array(await file.arrayBuffer());
+    const signature = detectPhotoType(input);
+    if (!signature || (file.type && file.type !== signature.mimeType)) throw new DomainError(415, "UNSUPPORTED_PHOTO", "Only valid JPEG, PNG, and WebP images are supported");
+    const filename = sanitizeFilename(file.name);
+    let body: Uint8Array;
+    try {
+      body = await normalizePhotoImage(input, signature, this.limits);
+    } catch (error) {
+      if (error instanceof PhotoImageError) throw new DomainError(error.code === "INVALID_IMAGE" ? 415 : 413, error.code, error.message);
+      throw error;
+    }
+    const hash = idempotencyKey ? await this.payloadHash(storeId, signature.mimeType, filename, input) : undefined;
+    if (idempotencyKey && hash) {
+      const existing = await this.existingIdempotent(principal, storeId, idempotencyKey, hash);
+      if (existing) return existing;
+    }
+    const storageKey = `quiz-answer-photos/${crypto.randomUUID()}.${signature.extension}`;
+    try {
+      await this.storage.put(storageKey, body, signature.mimeType);
+      const photo = await this.db.transaction(async (tx) => {
+        const [createdPhoto] = await tx.insert(photos).values({ storeId, uploadedBy: principal.userId, storageKey, idempotencyKey: idempotencyKey ?? null, idempotencyPayloadHash: hash ?? null, originalFilename: filename, mimeType: signature.mimeType, fileSize: body.byteLength }).returning();
+        await tx.insert(domainEvents).values({ eventType: "quiz.photo_answer_uploaded", aggregateType: "photo", aggregateId: createdPhoto.id, actorId: principal.userId, payload: { photoId: createdPhoto.id, storeId, uploadedBy: principal.userId } });
+        return createdPhoto;
+      });
+      return { photo: toPhotoResponse(photo), created: true };
+    } catch (error) {
+      if (idempotencyKey && hash && isUniqueViolation(error)) {
+        try { await this.storage.delete(storageKey); } catch (cleanupError) { this.logger?.error("Orphaned quiz answer photo cleanup failed", { cleanupError, storageKey }); }
+        const existing = await this.existingIdempotent(principal, storeId, idempotencyKey, hash);
+        if (existing) return existing;
+      }
+      if (!(idempotencyKey && hash && isUniqueViolation(error))) {
+        try { await this.storage.delete(storageKey); } catch (cleanupError) { this.logger?.error("Orphaned quiz answer photo cleanup failed", { cleanupError, storageKey }); }
+      }
+      throw error;
+    }
+  }
+
   async deletePhoto(principal: TrustedPrincipal, photoId: string): Promise<void> {
     assertActivePrincipal(principal);
     if (principal.role !== "admin") throw new DomainError(403, "FORBIDDEN", "Only administrators can delete photos");
