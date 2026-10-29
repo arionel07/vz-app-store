@@ -1,11 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq, inArray } from "drizzle-orm";
+import { createApp } from "../src/app";
 import { loadEnv } from "../src/config/env";
 import { createDatabase } from "../src/db/client";
 import { stores, userStores, users } from "../src/db/schema";
 import { type TrustedPrincipal } from "../src/domain/authz";
 import { createStoresService } from "../src/domain/stores/service";
 import { createUsersService } from "../src/domain/users/service";
+import { createEmployeeProfileService } from "../src/domain/employees/profile-service";
 
 const integrationEnabled = Bun.env.RUN_INTEGRATION_TESTS === "1";
 const suite = integrationEnabled ? describe : describe.skip;
@@ -14,6 +16,7 @@ suite("Users and Stores PostgreSQL integration", () => {
   const { db, client } = createDatabase(loadEnv());
   const storesService = createStoresService(db);
   const usersService = createUsersService(db);
+  const profilesService = createEmployeeProfileService(db, usersService);
   const admin: TrustedPrincipal = {
     userId: crypto.randomUUID(),
     role: "admin",
@@ -184,6 +187,67 @@ suite("Users and Stores PostgreSQL integration", () => {
     };
     expect((await usersService.getUserById(staffPrincipal, staffA)).id).toBe(staffA);
     await expect(usersService.getUserById(staffPrincipal, staffB)).rejects.toMatchObject({ status: 403 });
+  });
+
+  test("supports scoped employee profiles with conservative sensitive-field access", async () => {
+    const adminProfile = await profilesService.updateProfile(admin, staffA, {
+      jobTitle: "Старший консультант",
+      employmentStartedOn: "2025-02-03",
+      birthDate: "1995-04-05",
+      gender: "Не указано",
+    });
+    expect(adminProfile).toMatchObject({
+      userId: staffA,
+      jobTitle: "Старший консультант",
+      employmentStartedOn: "2025-02-03",
+      birthDate: "1995-04-05",
+      gender: "Не указано",
+    });
+
+    const managerProfile = await profilesService.getProfile(manager, staffA);
+    expect(managerProfile).toMatchObject({ userId: staffA, jobTitle: "Старший консультант" });
+    expect(managerProfile).not.toHaveProperty("birthDate");
+    expect(managerProfile).not.toHaveProperty("gender");
+
+    const updatedByManager = await profilesService.updateProfile(manager, staffA, { jobTitle: "Консультант" });
+    expect(updatedByManager.jobTitle).toBe("Консультант");
+    await expect(profilesService.updateProfile(manager, staffA, { birthDate: "1996-01-01" })).rejects.toMatchObject({
+      status: 403,
+      code: "PROFILE_FIELD_FORBIDDEN",
+    });
+    await expect(profilesService.getProfile(manager, staffB)).rejects.toMatchObject({ status: 403 });
+
+    const staffPrincipal: TrustedPrincipal = {
+      userId: staffA,
+      role: "staff",
+      storeIds: [storeA],
+      isActive: true,
+    };
+    const ownProfile = await profilesService.getProfile(staffPrincipal, staffA);
+    expect(ownProfile).toMatchObject({ userId: staffA, jobTitle: "Консультант" });
+    expect(ownProfile).not.toHaveProperty("birthDate");
+    await expect(profilesService.getProfile(staffPrincipal, staffB)).rejects.toMatchObject({ status: 403 });
+
+    const staffApp = createApp({
+      db,
+      allowedOrigins: [],
+      managementServices: { users: usersService, stores: storesService, profiles: profilesService },
+      resolvePrincipal: () => staffPrincipal,
+    });
+    const selfResponse = await staffApp.request("http://localhost/api/v1/me/profile");
+    expect(selfResponse.status).toBe(200);
+    expect(await selfResponse.json()).not.toHaveProperty("birthDate");
+
+    const managerApp = createApp({
+      db,
+      allowedOrigins: [],
+      managementServices: { users: usersService, stores: storesService, profiles: profilesService },
+      resolvePrincipal: () => manager,
+    });
+    const scopedResponse = await managerApp.request(`http://localhost/api/v1/users/${staffA}/profile`);
+    expect(scopedResponse.status).toBe(200);
+    const forbiddenResponse = await managerApp.request(`http://localhost/api/v1/users/${staffB}/profile`);
+    expect(forbiddenResponse.status).toBe(403);
   });
 
   test("handles inactive users/stores and pagination", async () => {

@@ -1,6 +1,7 @@
-import { LogOut, Moon, Smartphone, Sun, UserRound } from 'lucide-react-native'
-import { useState } from 'react'
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { BriefcaseBusiness, CalendarDays, LogOut, Moon, Smartphone, Sun, UserRound } from 'lucide-react-native'
+import { useEffect, useState } from 'react'
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { getMyProfile } from '../src/api/client'
 import { useAuth } from '../src/auth/auth-context'
 import { ActionButton, Screen, ScreenHeader, SectionTitle } from '../src/components/ui'
 import { useAppTheme, type ThemeMode } from '../src/theme'
@@ -10,8 +11,26 @@ const roleLabels = { admin: 'Администратор', manager: 'Менедж
 
 export default function ProfileScreen() {
 	const { colors, mode, setMode } = useAppTheme()
-	const { user, logout } = useAuth()
+	const { user, logout, requestAuthenticated } = useAuth()
 	const [logoutBusy, setLogoutBusy] = useState(false)
+	const [profile, setProfile] = useState<Awaited<ReturnType<typeof getMyProfile>> | null>(null)
+	const [profileLoading, setProfileLoading] = useState(false)
+	const [profileError, setProfileError] = useState<string | null>(null)
+
+	useEffect(() => {
+		if (!user) return
+		let active = true
+		setProfileLoading(true)
+		setProfileError(null)
+		void requestAuthenticated(getMyProfile).then((nextProfile) => {
+			if (active) setProfile(nextProfile)
+		}).catch(() => {
+			if (active) setProfileError('Не удалось загрузить дополнительные данные профиля')
+		}).finally(() => {
+			if (active) setProfileLoading(false)
+		})
+		return () => { active = false }
+	}, [requestAuthenticated, user])
 
 	if (!user) return <Screen><ScreenHeader title="Профиль" back backFallback="/(tabs)" /></Screen>
 
@@ -32,7 +51,8 @@ export default function ProfileScreen() {
 	return <Screen>
 		<ScreenHeader title="Профиль" back backFallback="/(tabs)" />
 		<View style={styles.identity}><View style={[styles.avatar, { backgroundColor: colors.accent }]}><Text style={[styles.avatarText, { color: colors.onAccent }]}>{initials}</Text></View><View style={styles.identityCopy}><Text style={[styles.name, { color: colors.text }]}>{user.firstName} {user.lastName}</Text><Text style={[styles.muted, { color: colors.muted }]}>{user.email ?? 'Email не указан'}</Text></View></View>
-		<View style={[styles.infoCard, { backgroundColor: colors.surfaceRaised }]}><View style={styles.infoRow}><UserRound color={colors.muted} size={19} /><View><Text style={[styles.infoLabel, { color: colors.muted }]}>Роль</Text><Text style={[styles.infoValue, { color: colors.text }]}>{roleLabels[user.role]}</Text></View></View><View style={[styles.divider, { backgroundColor: colors.border }]} /><View style={styles.infoRow}><Smartphone color={colors.muted} size={19} /><View style={styles.storeCopy}><Text style={[styles.infoLabel, { color: colors.muted }]}>Активные магазины</Text>{user.assignedStores.length === 0 ? <Text style={[styles.infoValue, { color: colors.text }]}>Нет активных назначений</Text> : user.assignedStores.map((store) => <Text key={store.id} style={[styles.infoValue, { color: colors.text }]}>{store.name} · {store.code}</Text>)}</View></View><View style={[styles.divider, { backgroundColor: colors.border }]} /><View style={styles.infoRow}><Text style={[styles.statusDot, { color: user.isActive ? colors.success : colors.danger }]}>●</Text><View><Text style={[styles.infoLabel, { color: colors.muted }]}>Статус аккаунта</Text><Text style={[styles.infoValue, { color: colors.text }]}>{user.isActive ? 'Активен' : 'Неактивен'}</Text></View></View></View>
+		<View style={[styles.infoCard, { backgroundColor: colors.surfaceRaised }]}><View style={styles.infoRow}><UserRound color={colors.muted} size={19} /><View><Text style={[styles.infoLabel, { color: colors.muted }]}>Роль</Text><Text style={[styles.infoValue, { color: colors.text }]}>{roleLabels[user.role]}</Text></View></View><View style={[styles.divider, { backgroundColor: colors.border }]} /><View style={styles.infoRow}><BriefcaseBusiness color={colors.muted} size={19} /><View style={styles.storeCopy}><Text style={[styles.infoLabel, { color: colors.muted }]}>Должность</Text>{profileLoading ? <ActivityIndicator size="small" color={colors.muted} /> : <Text style={[styles.infoValue, { color: colors.text }]}>{profile?.jobTitle ?? 'Не указана'}</Text>}</View></View><View style={[styles.divider, { backgroundColor: colors.border }]} /><View style={styles.infoRow}><CalendarDays color={colors.muted} size={19} /><View style={styles.storeCopy}><Text style={[styles.infoLabel, { color: colors.muted }]}>Начало работы</Text><Text style={[styles.infoValue, { color: colors.text }]}>{profile?.employmentStartedOn ?? 'Не указано'}</Text></View></View><View style={[styles.divider, { backgroundColor: colors.border }]} /><View style={styles.infoRow}><Smartphone color={colors.muted} size={19} /><View style={styles.storeCopy}><Text style={[styles.infoLabel, { color: colors.muted }]}>Активные магазины</Text>{user.assignedStores.length === 0 ? <Text style={[styles.infoValue, { color: colors.text }]}>Нет активных назначений</Text> : user.assignedStores.map((store) => <Text key={store.id} style={[styles.infoValue, { color: colors.text }]}>{store.name} · {store.code}</Text>)}</View></View><View style={[styles.divider, { backgroundColor: colors.border }]} /><View style={styles.infoRow}><Text style={[styles.statusDot, { color: user.isActive ? colors.success : colors.danger }]}>●</Text><View><Text style={[styles.infoLabel, { color: colors.muted }]}>Статус аккаунта</Text><Text style={[styles.infoValue, { color: colors.text }]}>{user.isActive ? 'Активен' : 'Неактивен'}</Text></View></View></View>
+		{profileError && <Text style={[styles.profileError, { color: colors.danger }]}>{profileError}</Text>}
 		<SectionTitle>Внешний вид</SectionTitle>
 		<View style={[styles.themeGroup, { backgroundColor: colors.surfaceRaised }]}>{modes.map(({ value, label, icon: Icon }) => { const active = value === mode; return <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected: active }} onPress={() => setMode(value)} style={[styles.themeChoice, active && { backgroundColor: colors.accent }]}><Icon size={17} color={active ? colors.onAccent : colors.muted} /><Text style={[styles.themeLabel, { color: active ? colors.onAccent : colors.muted }]}>{label}</Text></Pressable> })}</View>
 		<View style={styles.logoutBlock}><ActionButton label={logoutBusy ? 'Выходим…' : 'Выйти из аккаунта'} icon={LogOut} variant="secondary" disabled={logoutBusy} onPress={confirmLogout} /></View>
@@ -57,4 +77,5 @@ const styles = StyleSheet.create({
 	themeChoice: { flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 12 },
 	themeLabel: { fontSize: 12, fontWeight: '600' },
 	logoutBlock: { gap: 9 },
+	profileError: { fontSize: 13, lineHeight: 18 },
 })

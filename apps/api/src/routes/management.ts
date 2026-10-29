@@ -7,7 +7,9 @@ import {
   updateStoreSchema,
   updateUserSchema,
   userListQuerySchema,
+  employeeProfileUpdateSchema,
 } from "@vizaje/contracts";
+import type { EmployeeProfileService } from "../domain/employees/profile-service";
 import type { StoresService } from "../domain/stores/service";
 import type { TrustedPrincipal } from "../domain/authz";
 import { DomainError } from "../domain/errors";
@@ -16,6 +18,7 @@ import type { UsersService } from "../domain/users/service";
 export interface ManagementServices {
   users: UsersService;
   stores: StoresService;
+  profiles?: EmployeeProfileService;
 }
 
 export type PrincipalResolver = (context: Context) => TrustedPrincipal | null | Promise<TrustedPrincipal | null>;
@@ -51,6 +54,12 @@ function requireServices(services: ManagementServices | undefined): ManagementSe
   return services;
 }
 
+function requireProfiles(services: ManagementServices | undefined): EmployeeProfileService {
+  const profileService = requireServices(services).profiles;
+  if (!profileService) throw new Error("Employee profile services are not configured");
+  return profileService;
+}
+
 export function registerManagementRoutes(
   app: Hono,
   services: ManagementServices | undefined,
@@ -73,6 +82,25 @@ export function registerManagementRoutes(
   app.get("/api/v1/users/:id", async (context) => {
     const principal = await requirePrincipal(resolvePrincipal, context);
     const result = await requireServices(services).users.getUserById(principal, parseId(context.req.param("id"), "User"));
+    return context.json(result, 200);
+  });
+
+  app.get("/api/v1/me/profile", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    const result = await requireProfiles(services).getProfile(principal, principal.userId);
+    return context.json(result, 200);
+  });
+
+  app.get("/api/v1/users/:id/profile", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    const result = await requireProfiles(services).getProfile(principal, parseId(context.req.param("id"), "User"));
+    return context.json(result, 200);
+  });
+
+  app.patch("/api/v1/users/:id/profile", async (context) => {
+    const principal = await requirePrincipal(resolvePrincipal, context);
+    const body = parseInput(employeeProfileUpdateSchema, await parseJson(context));
+    const result = await requireProfiles(services).updateProfile(principal, parseId(context.req.param("id"), "User"), body);
     return context.json(result, 200);
   });
 

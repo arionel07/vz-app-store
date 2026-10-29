@@ -441,13 +441,13 @@ Each milestone below is intentionally scoped into Backend, Admin, Mobile, Shared
 
 Dependencies: current users/stores/auth services; business approval of optional sensitive fields.
 
-- **Backend:** Add profile service and field-level authorization. Keep password/session data in auth. Add profile photo upload/reference using private media rules. Define projections for admin, manager, and self.
-- **Admin:** Add profile fields to employee detail/edit flow; show only fields permitted by role; support profile photo and employment metadata without changing the existing shell.
-- **Mobile:** Show the staff member's allowed name, job title, assigned stores, and profile image; never expose password hash/session data or unrelated HR fields.
-- **Shared contracts:** Add profile request/response schemas, redacted projections, date/optional-field validation, and profile-photo references.
-- **Database migrations:** Add `employee_profiles` and any profile-media link/audit structure. Backfill only deterministic existing values; leave unknown fields null.
-- **Automated tests:** Field authorization, manager scope, self-access, validation, profile photo access, inactive users, migration/backfill, and contract parsing.
-- **Acceptance criteria:** Admin can edit approved profile fields; managers cannot read out-of-scope/sensitive fields; staff can see only their own allowed profile; existing login, activation, and store assignment behavior is unchanged.
+- **Backend:** Add profile service and field-level authorization. Keep password/session data in auth. Define projections for admin, manager, and self. Profile photo upload/reference is deferred until media ownership can be modeled separately from store photo reports; no profile image should reuse the current staff upload endpoint.
+- **Admin:** Add profile fields to employee detail/edit flow; show only fields permitted by role and keep the existing shell. Profile photo UI remains deferred with the secure media design.
+- **Mobile:** Show the staff member's allowed name, job title, assigned stores, and employment date; never expose password hash/session data, sensitive HR fields, or an unowned profile image.
+- **Shared contracts:** Add profile request/response schemas, redacted projections, and date/optional-field validation. Do not add a profile-media contract until ownership and retention are defined.
+- **Database migrations:** Add `employee_profiles` and backfill only deterministic existing values; leave unknown fields null. Do not attach profile media to the current `photos` table.
+- **Automated tests:** Field authorization, manager scope, self-access, validation, inactive users, migration/backfill, and contract parsing. Add profile-media tests only with its dedicated design.
+- **Acceptance criteria:** Admin can edit approved profile fields; managers cannot read out-of-scope/sensitive fields; staff can see only their own allowed profile; profile images remain explicitly unavailable until a secure media ownership design is approved; existing login, activation, and store assignment behavior is unchanged.
 
 ### Milestone 13 — Photo review workflow
 

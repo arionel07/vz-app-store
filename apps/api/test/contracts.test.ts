@@ -2,6 +2,9 @@ import { expect, test } from "bun:test";
 import {
   dashboardFiltersSchema,
   dashboardOverviewResponseSchema,
+  employeeProfileAdminResponseSchema,
+  employeeProfileSafeResponseSchema,
+  employeeProfileUpdateSchema,
   errorResponseSchema,
   photoResponseSchema,
   quizStaffResponseSchema,
@@ -66,4 +69,27 @@ test("shared contracts are client-safe and parse representative API payloads", (
       uploadedPhotoCount: 0,
     },
   }).metrics.averageCompletedAttemptScore).toBeNull();
+
+  expect(employeeProfileUpdateSchema.parse({
+    jobTitle: "Консультант",
+    employmentStartedOn: "2025-02-03",
+    birthDate: "1995-04-05",
+    gender: "Не указано",
+  })).toMatchObject({ jobTitle: "Консультант", employmentStartedOn: "2025-02-03" });
+  expect(() => employeeProfileUpdateSchema.parse({ employmentStartedOn: "2025-02-30" })).toThrow();
+  expect(() => employeeProfileUpdateSchema.parse({ birthDate: "2099-01-01" })).toThrow();
+
+  const safeProfile = employeeProfileSafeResponseSchema.parse({
+    userId,
+    jobTitle: "Консультант",
+    employmentStartedOn: "2025-02-03",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+  expect(safeProfile).not.toHaveProperty("birthDate");
+  expect(employeeProfileAdminResponseSchema.parse({
+    ...safeProfile,
+    birthDate: "1995-04-05",
+    gender: "Не указано",
+  }).gender).toBe("Не указано");
 });

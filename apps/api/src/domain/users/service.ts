@@ -18,7 +18,7 @@ import {
   type UserResponse,
 } from "@vizaje/contracts";
 import type { Database } from "../../db/client";
-import { stores, userStores, users } from "../../db/schema";
+import { employeeProfiles, stores, userStores, users } from "../../db/schema";
 import {
   assertCanManageMembership,
   assertCanManageTargetUser,
@@ -133,6 +133,8 @@ export class UsersService {
         if (data.storeIds.length > 0) {
           await tx.insert(userStores).values(data.storeIds.map((storeId) => ({ userId: created.id, storeId })));
         }
+
+        await tx.insert(employeeProfiles).values({ userId: created.id });
 
         return created.id;
       });

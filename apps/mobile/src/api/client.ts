@@ -12,6 +12,7 @@ import {
 	storeListResponseSchema,
 	photoListResponseSchema,
 	photoResponseSchema,
+	employeeProfileSafeResponseSchema,
 	userResponseSchema,
 	type AttemptListQuery,
 	type AttemptListResponse,
@@ -26,6 +27,7 @@ import {
 	type PhotoResponse,
 	type SubmitAttemptInput,
 	type UserResponse,
+	type EmployeeProfileSafeResponse,
 } from '@vizaje/contracts'
 
 const REQUEST_TIMEOUT_MS = 10_000
@@ -159,6 +161,10 @@ export function mobileLogin(email: string, password: string, deviceId: string): 
 
 export function getCurrentUser(token: string): Promise<UserResponse> {
 	return requestJson('/api/v1/auth/me', userResponseSchema, { token, allowRetry: true })
+}
+
+export function getMyProfile(token: string): Promise<EmployeeProfileSafeResponse> {
+	return requestJson('/api/v1/me/profile', employeeProfileSafeResponseSchema, { token, allowRetry: true })
 }
 
 export function listStores(token: string, query: StoreListQuery = { page: 1, pageSize: 100, sortBy: 'name', sortDirection: 'asc' }): Promise<StoreListResponse> {

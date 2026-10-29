@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { getAvailableQuiz, getCurrentUser, listAvailableQuizzes, listMyAttempts, mobileLogin, redeemActivation, resolveApiOrigin, startQuizAttempt, submitQuizAttempt, uploadPhoto } from '../src/api/client'
+import { getAvailableQuiz, getCurrentUser, getMyProfile, listAvailableQuizzes, listMyAttempts, mobileLogin, redeemActivation, resolveApiOrigin, startQuizAttempt, submitQuizAttempt, uploadPhoto } from '../src/api/client'
 import { mobileLoginErrorMessage } from '../src/auth/login-errors'
 
 process.env.EXPO_PUBLIC_API_URL ??= 'http://127.0.0.1:3000'
@@ -109,6 +109,22 @@ describe('mobile API client', () => {
 			return new Response(JSON.stringify(user), { status: 200 })
 		}) as typeof fetch
 		expect(await getCurrentUser('access-token')).toEqual(user)
+	})
+
+	test('loads the redacted employee profile through the mobile endpoint', async () => {
+		const profile = {
+			userId: user.id,
+			jobTitle: 'Консультант',
+			employmentStartedOn: '2025-02-03',
+			createdAt: '2026-01-01T00:00:00.000Z',
+			updatedAt: '2026-01-01T00:00:00.000Z',
+		}
+		globalThis.fetch = (async (input, init) => {
+			expect(String(input)).toContain('/api/v1/me/profile')
+			expect(init?.headers).toMatchObject({ Authorization: 'Bearer access-token', Accept: 'application/json' })
+			return new Response(JSON.stringify(profile), { status: 200 })
+		}) as typeof fetch
+		expect(await getMyProfile('access-token')).toEqual(profile)
 	})
 
 	test('normalizes backend unavailability without exposing transport details', async () => {

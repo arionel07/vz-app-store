@@ -4,6 +4,7 @@ import { loadEnv } from "../config/env";
 import { createDatabase } from "../db/client";
 import { createStoresService } from "../domain/stores/service";
 import { createUsersService } from "../domain/users/service";
+import { createEmployeeProfileService } from "../domain/employees/profile-service";
 import { createQuizAttemptService } from "../domain/quizzes/attempt-service";
 import { createQuizService } from "../domain/quizzes/service";
 import { createPhotosService } from "../domain/photos/service";
@@ -26,12 +27,14 @@ export function startServer() {
     maxPixels: env.PHOTO_MAX_PIXELS,
   }, logger);
   const dashboard = createDashboardService(db);
+  const usersService = createUsersService(db);
   const app = createApp({
     db,
     allowedOrigins: env.CORS_ALLOWED_ORIGINS,
     managementServices: {
-      users: createUsersService(db),
+      users: usersService,
       stores: createStoresService(db),
+      profiles: createEmployeeProfileService(db, usersService),
     },
     resolvePrincipal: auth.principalResolver(),
     authRoutes: {

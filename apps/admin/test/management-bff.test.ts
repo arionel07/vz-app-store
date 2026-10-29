@@ -4,6 +4,7 @@ import { POST as assignStore, DELETE as removeStore } from '../src/app/api/admin
 import { GET as getStores, POST as createStore } from '../src/app/api/admin/stores/route'
 import { POST as activate } from '../src/app/api/admin/activation/route'
 import { POST as setPassword } from '../src/app/api/admin/employees/[id]/password/route'
+import { GET as getEmployeeProfile, PATCH as updateEmployeeProfile } from '../src/app/api/admin/employees/[id]/profile/route'
 
 const originalFetch = globalThis.fetch
 const apiUrl = 'http://127.0.0.1:3000'
@@ -28,6 +29,16 @@ const store = {
 	name: 'Тестовый магазин',
 	code: 'TEST-001',
 	isActive: true,
+	createdAt: '2026-01-01T00:00:00.000Z',
+	updatedAt: '2026-01-01T00:00:00.000Z',
+}
+
+const employeeProfile = {
+	userId,
+	jobTitle: 'Консультант',
+	employmentStartedOn: '2025-02-03',
+	birthDate: '1995-04-05',
+	gender: 'Не указано',
 	createdAt: '2026-01-01T00:00:00.000Z',
 	updatedAt: '2026-01-01T00:00:00.000Z',
 }
@@ -155,5 +166,30 @@ describe('management BFF', () => {
 		expect(new Headers(captured?.headers).get('cookie')).toBe('vizaje_session=session')
 		expect(new Headers(captured?.headers).get('x-csrf-token')).toBe('csrf')
 		expect(JSON.parse(String(captured?.body))).toEqual({ userId, password: 'staff-password-123' })
+	})
+
+	test('forwards employee profile reads and updates through an explicit CSRF-protected route', async () => {
+		process.env.VIZAJE_API_URL = apiUrl
+		let target = ''
+		let captured: RequestInit | undefined
+		globalThis.fetch = (async (input, init) => {
+			target = String(input)
+			captured = init
+			return upstream(init?.method === 'PATCH' ? 200 : 200, employeeProfile)
+		}) as typeof fetch
+
+		const read = await getEmployeeProfile(request(`/api/admin/employees/${userId}/profile`, { headers: { cookie: 'vizaje_session=session' } }), { params: Promise.resolve({ id: userId }) })
+		expect(read.status).toBe(200)
+		expect(target).toContain(`/api/v1/users/${userId}/profile`)
+
+		const updated = await updateEmployeeProfile(request(`/api/admin/employees/${userId}/profile`, {
+			method: 'PATCH',
+			headers: { cookie: 'vizaje_session=session; vizaje_csrf=csrf', 'x-csrf-token': 'csrf' },
+			body: JSON.stringify({ jobTitle: 'Старший консультант', employmentStartedOn: '2025-02-03' }),
+		}), { params: Promise.resolve({ id: userId }) })
+		expect(updated.status).toBe(200)
+		expect(new Headers(captured?.headers).get('cookie')).toBe('vizaje_session=session')
+		expect(new Headers(captured?.headers).get('x-csrf-token')).toBe('csrf')
+		expect(JSON.parse(String(captured?.body))).toEqual({ jobTitle: 'Старший консультант', employmentStartedOn: '2025-02-03' })
 	})
 })

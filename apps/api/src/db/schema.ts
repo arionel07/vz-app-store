@@ -2,6 +2,7 @@ import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
   integer,
   index,
   pgEnum,
@@ -77,8 +78,9 @@ export const userStores = pgTable(
   ],
 );
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
   userStores: many(userStores),
+  profile: one(employeeProfiles, { fields: [users.id], references: [employeeProfiles.userId] }),
 }));
 
 export const storesRelations = relations(stores, ({ many }) => ({
@@ -88,6 +90,25 @@ export const storesRelations = relations(stores, ({ many }) => ({
 export const userStoresRelations = relations(userStores, ({ one }) => ({
   user: one(users, { fields: [userStores.userId], references: [users.id] }),
   store: one(stores, { fields: [userStores.storeId], references: [stores.id] }),
+}));
+
+export const employeeProfiles = pgTable(
+  "employee_profiles",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    jobTitle: text("job_title"),
+    employmentStartedOn: date("employment_started_on", { mode: "string" }),
+    birthDate: date("birth_date", { mode: "string" }),
+    gender: text("gender"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+);
+
+export const employeeProfilesRelations = relations(employeeProfiles, ({ one }) => ({
+  user: one(users, { fields: [employeeProfiles.userId], references: [users.id] }),
 }));
 
 export const photos = pgTable(
