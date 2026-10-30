@@ -25,6 +25,7 @@ import {
 	Sun,
 	UsersRound,
 	LoaderCircle,
+	Megaphone,
 } from 'lucide-react'
 import { cn } from 'cn'
 import { getBrowserCsrfToken } from '@/lib/auth-client'
@@ -39,6 +40,7 @@ const navItems = [
 	{ label: 'Фотографии', icon: Image, value: 'photos' },
 	{ label: 'Расписание', icon: CalendarDays, value: 'schedules' },
 	{ label: 'Задания', icon: ListChecks, value: 'tasks' },
+	{ label: 'Объявления', icon: Megaphone, value: 'announcements' },
 ]
 
 export function ThemeSwitcher() {
@@ -124,7 +126,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 					{navItems.map(({ label, icon: Icon, value }) => {
 						const path = value === 'overview' ? '/' : `/${value}`
 						const active = value === 'overview' ? isOverview : pathname.startsWith(path)
-						const implemented = value === 'overview' || value === 'employees' || value === 'stores' || value === 'quizzes' || value === 'results' || value === 'photos' || value === 'schedules' || value === 'tasks'
+						const implemented = value === 'overview' || value === 'employees' || value === 'stores' || value === 'quizzes' || value === 'results' || value === 'photos' || value === 'schedules' || value === 'tasks' || value === 'announcements'
 						return <button key={value} type="button" className={cn('nav-item', active && 'nav-item-active')} onClick={() => {
 							if (implemented) router.push(path)
 							else toast.info(`${label}: раздел будет доступен позже`)

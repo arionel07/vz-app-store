@@ -44,3 +44,11 @@ the API. Local shift times and overnight business dates come from the
 server's timezone-aware schedule contract.
 
 The Home screen also opens **Задания** without adding another bottom tab. The task flow loads only assigned occurrences, preserves server-side checklist versions, supports start/complete/submit transitions, and uploads optional or required evidence through authenticated foreground requests. Private evidence previews are downloaded to the device cache only; task tokens and storage keys are never persisted or logged.
+
+The Home header opens the authenticated inbox. It contains task, quiz, schedule,
+photo-review and targeted announcement messages. Push permission is requested
+only from the inbox, never during launch or login. Registration uses the current
+mobile bearer session and stores only a device identifier in SecureStore;
+logout removes that device registration. Expo push delivery also requires an
+EAS project ID in `expo.extra.eas.projectId`. The inbox remains usable when
+permission is denied or the provider is unavailable.

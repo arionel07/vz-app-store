@@ -5,6 +5,7 @@ import { GET as getStores, POST as createStore } from '../src/app/api/admin/stor
 import { POST as activate } from '../src/app/api/admin/activation/route'
 import { POST as setPassword } from '../src/app/api/admin/employees/[id]/password/route'
 import { GET as getEmployeeProfile, PATCH as updateEmployeeProfile } from '../src/app/api/admin/employees/[id]/profile/route'
+import { POST as createAnnouncement } from '../src/app/api/admin/announcements/route'
 
 const originalFetch = globalThis.fetch
 const apiUrl = 'http://127.0.0.1:3000'
@@ -41,6 +42,11 @@ const employeeProfile = {
 	gender: 'Не указано',
 	createdAt: '2026-01-01T00:00:00.000Z',
 	updatedAt: '2026-01-01T00:00:00.000Z',
+}
+
+const announcement = {
+	id: '00000000-0000-4000-8000-000000000003', title: 'Важная новость', body: 'Текст объявления', status: 'draft', storeIds: [storeId], roles: ['staff'], requiresAcknowledgement: true,
+	createdBy: userId, publishedBy: null, publishedAt: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', metrics: { recipientCount: 0, readCount: 0, acknowledgedCount: 0 },
 }
 
 function upstream(status: number, payload: unknown): Response {
@@ -191,5 +197,17 @@ describe('management BFF', () => {
 		expect(new Headers(captured?.headers).get('cookie')).toBe('vizaje_session=session')
 		expect(new Headers(captured?.headers).get('x-csrf-token')).toBe('csrf')
 		expect(JSON.parse(String(captured?.body))).toEqual({ jobTitle: 'Старший консультант', employmentStartedOn: '2025-02-03' })
+	})
+
+	test('keeps announcement management explicit, typed and CSRF-protected', async () => {
+		process.env.VIZAJE_API_URL = apiUrl
+		let target = ''
+		let captured: RequestInit | undefined
+		globalThis.fetch = (async (input, init) => { target = String(input); captured = init; return upstream(201, announcement) }) as typeof fetch
+		const response = await createAnnouncement(request('/api/admin/announcements', { method: 'POST', headers: { cookie: 'vizaje_session=session; vizaje_csrf=csrf', 'x-csrf-token': 'csrf' }, body: JSON.stringify({ title: announcement.title, body: announcement.body, storeIds: [storeId], roles: ['staff'], requiresAcknowledgement: true }) }))
+		expect(response.status).toBe(201)
+		expect(target).toContain('/api/v1/management/announcements')
+		expect(new Headers(captured?.headers).get('cookie')).toBe('vizaje_session=session')
+		expect(new Headers(captured?.headers).get('x-csrf-token')).toBe('csrf')
 	})
 })

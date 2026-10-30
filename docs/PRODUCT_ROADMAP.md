@@ -51,7 +51,7 @@ The Drizzle schema currently contains these PostgreSQL structures:
 | Quizzes | `quizzes`, `quiz_revisions`, `quiz_questions`, `quiz_options`, `quiz_assignments` | Draft/published/archive lifecycle, revision graph and store assignment |
 | Attempts | `quiz_attempts`, `quiz_attempt_answers`, `quiz_attempt_status` | One active attempt per user/revision and server-calculated result |
 
-There are ten Drizzle migrations (`0000`–`0009`). The employee profile and photo review migrations are additive and backfill only deterministic relationships. Schedule, task, notification/outbox, knowledge base, and operational campaign tables are still outside the implemented scope.
+The Drizzle migrations are additive. Employee profiles, photo review, schedules, tasks, and notifications/outbox are implemented; knowledge base and operational campaign tables remain outside the implemented scope.
 
 The existing `users` table mixes identity/contact fields with authentication state. `password_hash` is nullable, which supports activated staff accounts that do not yet have a password. API responses correctly omit the hash. `user_stores` is the existing relationship for multi-store assignment.
 
@@ -103,19 +103,19 @@ Staff upload one JPEG, PNG, or WebP file to an assigned active store. The API va
 
 Uploads support an idempotency key scoped to the uploader and payload. Reads are private and authorization-aware; image responses are non-cacheable. Local filesystem storage is used in development/tests and S3 is required for production configuration.
 
-The `photos` table remains the private immutable media record. Milestone 13 adds a `photo_reports` parent, immutable `photo_report_versions`, `photo_review_history`, and durable `domain_events`. Legacy photos are represented as `PENDING` initial versions with an explicit historical note; they are not treated as approved. Rejected resubmissions create a new media/version row and retain prior versions. There is still no notification delivery infrastructure.
+The `photos` table remains the private immutable media record. Milestone 13 adds a `photo_reports` parent, immutable `photo_report_versions`, `photo_review_history`, and durable `domain_events`. Legacy photos are represented as `PENDING` initial versions with an explicit historical note; they are not treated as approved. Rejected resubmissions create a new media/version row and retain prior versions. Milestone 17 consumes these events through the PostgreSQL notification worker.
 
 ### 2.7 Admin, Mobile, and shared contracts
 
 Admin already has pages/BFFs for overview, employees, stores, quizzes, results, and photos. The protected layout performs a server-side admin/manager check. Managers see scoped data because the API applies the scope, not because the UI hides rows.
 
-Mobile already has screens for Home, quizzes/attempts/results, photo capture/upload/history, profile, activation, and login. It does not yet have schedules, tasks, notifications, knowledge base, review status, or expanded employee profile fields.
+Mobile already has screens for Home, quizzes/attempts/results, photo capture/upload/history, profile, activation, login, schedules, tasks, and the notification inbox. Knowledge base and expanded employee profile fields remain future work.
 
-`packages/contracts` is the shared validation boundary. It contains auth, activation, users, stores, quizzes, photos, dashboard, and health contracts. Future modules should add explicit files and exports rather than duplicating schemas in Admin, Mobile, and API.
+`packages/contracts` is the shared validation boundary. It contains auth, activation, users, stores, quizzes, photos, dashboard, tasks, notifications, announcements, and health contracts. Future modules should add explicit files and exports rather than duplicating schemas in Admin, Mobile, and API.
 
 ### 2.8 Notifications and tests
 
-No notification provider, Expo push-token registration, in-app notification table, outbox, queue, broker, Redis integration, or announcement module exists. The repository README explicitly records that queues, microservices, and push automation are not present.
+Milestone 17 now provides an explicit Expo provider adapter, device registration, durable inbox, PostgreSQL outbox/delivery-attempt tables, bounded worker, and scoped announcement module. Redis, a broker, and microservices remain intentionally out of scope.
 
 Coverage is meaningful for the existing foundation:
 
@@ -124,7 +124,7 @@ Coverage is meaningful for the existing foundation:
 - Admin tests cover auth, management, quiz, media, and dashboard BFF behavior.
 - Mobile tests cover API validation/errors, activation payload parsing, navigation safety, SecureStore session behavior, quiz drafts/model, photo processing/queue, and store selection.
 
-There are no tests for the future modules described below because those modules do not exist yet.
+Notification integration tests cover recipient scope, inbox dedupe, push delivery, invalid-token invalidation, delivery-attempt history, announcements, and mobile safe targets.
 
 ## 3. Existing functionality versus planned functionality
 
@@ -142,7 +142,7 @@ There are no tests for the future modules described below because those modules 
 | Advanced quiz engine | Implemented | Milestone 14 |
 | Work schedules | Implemented | Milestone 15; timezone-aware draft/publication/history flow, Admin editor, and staff Mobile read-only schedule |
 | Tasks/checklists | Implemented | Milestone 16; scoped templates, occurrences, checklists, private evidence, review history, Admin and Mobile clients |
-| In-app/push notifications and announcements | Not implemented | Milestone 17 |
+| In-app/push notifications and announcements | Implemented in Milestone 17 | Milestone 18+ extensions |
 | Knowledge base | Not implemented | Milestone 18 |
 | Retail operations | Not implemented | Milestone 19 |
 | Advanced reporting | Not implemented | Milestone 20 |
@@ -501,7 +501,7 @@ Dependencies: review/audit conventions from Milestone 13; photo evidence access;
 - **Automated tests:** Scope, recurring occurrence identity, checklist validation, evidence authorization, concurrent review, rejection/resubmission, deadlines, idempotency, and offline retry behavior.
 - **Acceptance criteria:** Employees can submit only assigned tasks; managers review only authorized stores; required checklist/evidence rules are enforced; prior submissions remain auditable; recurring changes do not rewrite history.
 
-Status: implemented on the SDK 58 upgrade branch. The additive `0013_tasks_checklists` migration stores versioned template snapshots, independently assigned task occurrences, recurrence materialization keys, checklist state, submissions, private task evidence, and immutable review history. API transitions use optimistic versions plus transaction-scoped advisory locks for review concurrency; managers are restricted to their active stores and staff can only access assigned occurrences. Recurrence generation is explicit and idempotent through the management endpoint, with `Europe/Chisinau` as the current default timezone. Admin exposes task/template creation, scoped lists, deadlines, review actions, evidence access, and history. Mobile adds a Home entry and protected task/checklist flow without adding a fifth tab. Notifications, push delivery, and Milestone 17 remain deferred.
+Status: implemented on the SDK 58 upgrade branch. The additive `0013_tasks_checklists` migration stores versioned template snapshots, independently assigned task occurrences, recurrence materialization keys, checklist state, submissions, private task evidence, and immutable review history. API transitions use optimistic versions plus transaction-scoped advisory locks for review concurrency; managers are restricted to their active stores and staff can only access assigned occurrences. Recurrence generation is explicit and idempotent through the management endpoint, with `Europe/Chisinau` as the current default timezone. Admin exposes task/template creation, scoped lists, deadlines, review actions, evidence access, and history. Mobile adds a Home entry and protected task/checklist flow without adding a fifth tab. Management task reads enforce the same role/store boundary as writes.
 
 ### Milestone 17 — Notifications and announcements
 
@@ -514,6 +514,8 @@ Dependencies: stable domain events from photo, quiz, schedule, and task modules;
 - **Database migrations:** Add outbox, notifications, device tokens, preferences, announcements, targets, and delivery attempts.
 - **Automated tests:** Transactional event creation, recipient scope, dedupe, retries, invalid tokens, preference suppression, deep-link safety, logout/revocation, and no-sensitive-payload checks.
 - **Acceptance criteria:** Business actions remain correct if delivery is unavailable; events are not lost in the transaction; duplicate push/in-app deliveries are prevented; payloads contain no secrets or sensitive employee data; unread state is durable.
+
+Status: implemented on the SDK 58 upgrade branch. Migrations `0014_notifications` and `0015_notification_delivery_attempts` add durable inbox records, multiple push devices, preferences, event consumption, transactional outbox rows, delivery history, announcements, normalized role/store targets, and history. The API resolves active recipients from existing `domain_events`, deduplicates by event and recipient, enforces manager/admin scope, and exposes explicit Mobile and Admin/BFF routes. The worker uses PostgreSQL `SKIP LOCKED`, bounded retry/backoff, Expo ticket/receipt handling, and invalid-token invalidation. Mobile adds the authenticated inbox, contextual permission registration, logout cleanup, and allowlisted deep links. See `docs/notifications.md` for operational startup.
 
 ### Milestone 18 — Knowledge base
 
@@ -605,7 +607,7 @@ These questions should be answered before implementation of the corresponding mi
 8. Are quiz assignments by role and individual required immediately, or can store assignments remain the first extension?
 9. Are free-text/photo answers reviewed by managers, and what is the rubric/retention policy?
 10. Which task recurrence rules are needed, and who owns templates across stores?
-11. Should push notifications use Expo Push Service initially, and what operational owner handles invalid tokens and delivery failures?
+11. Milestone 17 uses Expo Push Service initially; the operational owner must monitor worker retries, receipts, and invalid-token cleanup before production rollout.
 12. Which announcements require acknowledgement, and what is the legal/operational meaning of an acknowledgement?
 13. Who can publish knowledge articles and attachments, and how long must old revisions remain available?
 14. Which retail operations workflows have measurable business value for the first 12 stores?
@@ -615,4 +617,4 @@ These questions should be answered before implementation of the corresponding mi
 
 The current repository is not missing a backend foundation; it has a working identity/store/authentication layer, private photo storage, revisioned quizzes, results, dashboard aggregates, and explicit Admin/Mobile clients. The future work is additive domain expansion.
 
-Milestones 12–16 address employee profiles, photo review, the advanced revisioned quiz engine, work schedules, and retail tasks/checklists. Notifications, knowledge base, retail operations, and advanced reporting remain future milestones.
+Milestones 12–17 address employee profiles, photo review, the advanced revisioned quiz engine, work schedules, retail tasks/checklists, and notifications/announcements. Knowledge base, retail operations, and advanced reporting remain future milestones.

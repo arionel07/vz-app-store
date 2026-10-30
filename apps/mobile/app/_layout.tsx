@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from '../src/auth/auth-context'
 import { SessionStatusScreen } from '../src/components/ui'
 import { authRedirect } from '../src/navigation/safe-navigation'
 import { AppThemeProvider, useAppTheme } from '../src/theme'
+import { NotificationBridge } from '../src/notifications/notification-bridge'
 
 function ThemedStatusBar() {
 	const { isDark } = useAppTheme()
@@ -36,6 +37,7 @@ function AuthGate({ children }: { children: ReactNode }) {
 export default function RootLayout() {
 	return <SafeAreaProvider><AppThemeProvider><AuthProvider>
 		<ThemedStatusBar />
+		<NotificationBridge />
 		<AuthGate><Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
 			<Stack.Screen name="(tabs)" />
 			<Stack.Screen name="profile" />
@@ -47,6 +49,8 @@ export default function RootLayout() {
 			<Stack.Screen name="quiz/[id]" />
 			<Stack.Screen name="quiz/[id]/attempt" />
 			<Stack.Screen name="attempt/[attemptId]" />
+			<Stack.Screen name="notifications" />
+			<Stack.Screen name="announcement/[id]" />
 		</Stack></AuthGate>
 	</AuthProvider></AppThemeProvider></SafeAreaProvider>
 }

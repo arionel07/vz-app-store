@@ -19,7 +19,7 @@ export function goBackOrReplace(navigation: SafeNavigation, fallback: Navigation
 export type AuthNavigationStatus = 'loading' | 'unauthenticated' | 'authenticated' | 'offline' | 'storage-error'
 
 export function authRedirect(status: AuthNavigationStatus, segment: string | undefined): NavigationHref | null {
-	const protectedRoute = segment === '(tabs)' || segment === 'profile' || segment === 'schedule' || segment === 'tasks' || segment === 'task' || segment === 'quiz' || segment === 'attempt'
+	const protectedRoute = segment === '(tabs)' || segment === 'profile' || segment === 'schedule' || segment === 'tasks' || segment === 'task' || segment === 'quiz' || segment === 'attempt' || segment === 'notifications' || segment === 'announcement'
 	const activationRoute = segment === 'activation' || segment === 'activate'
 	if (status === 'unauthenticated' && !segment) return '/activation'
 	if (status === 'authenticated' && !segment) return '/(tabs)'

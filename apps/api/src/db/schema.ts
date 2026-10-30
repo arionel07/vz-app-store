@@ -33,6 +33,10 @@ export const taskPriorityEnum = pgEnum("task_priority", ["low", "normal", "high"
 export const taskStatusEnum = pgEnum("task_status", ["assigned", "in_progress", "submitted", "checked", "rejected"]);
 export const taskSubmissionStatusEnum = pgEnum("task_submission_status", ["submitted", "checked", "rejected"]);
 export const taskRecurrenceFrequencyEnum = pgEnum("task_recurrence_frequency", ["daily", "weekly", "monthly"]);
+export const notificationTargetKindEnum = pgEnum("notification_target_kind", ["task", "photo_report", "quiz", "attempt", "schedule", "announcement"]);
+export const notificationOutboxStatusEnum = pgEnum("notification_outbox_status", ["pending", "claimed", "accepted", "retry", "permanent"]);
+export const pushPlatformEnum = pgEnum("push_platform", ["ios", "android"]);
+export const announcementStatusEnum = pgEnum("announcement_status", ["draft", "published", "archived"]);
 
 export const users = pgTable(
   "users",
@@ -241,6 +245,166 @@ export const domainEvents = pgTable(
     index("domain_events_aggregate_idx").on(table.aggregateType, table.aggregateId),
     index("domain_events_occurred_idx").on(table.occurredAt),
   ],
+);
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    recipientUserId: uuid("recipient_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    sourceEventId: uuid("source_event_id").references(() => domainEvents.id, { onDelete: "set null" }),
+    eventType: text("event_type").notNull(),
+    category: text("category").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    targetKind: notificationTargetKindEnum("target_kind"),
+    targetId: uuid("target_id"),
+    requiresAcknowledgement: boolean("requires_acknowledgement").notNull().default(false),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("notifications_event_recipient_unique").on(table.sourceEventId, table.recipientUserId),
+    index("notifications_recipient_created_idx").on(table.recipientUserId, table.createdAt),
+    index("notifications_recipient_read_idx").on(table.recipientUserId, table.readAt, table.createdAt),
+    index("notifications_target_idx").on(table.targetKind, table.targetId),
+  ],
+);
+
+export const pushDevices = pgTable(
+  "push_devices",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    deviceId: text("device_id").notNull(),
+    platform: pushPlatformEnum("platform").notNull(),
+    expoPushToken: text("expo_push_token").notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    invalidatedAt: timestamp("invalidated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("push_devices_user_device_unique").on(table.userId, table.deviceId),
+    uniqueIndex("push_devices_token_unique").on(table.expoPushToken),
+    index("push_devices_user_active_idx").on(table.userId, table.invalidatedAt),
+  ],
+);
+
+export const notificationPreferences = pgTable(
+  "notification_preferences",
+  {
+    userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+    pushEnabled: boolean("push_enabled").notNull().default(true),
+    taskNotifications: boolean("task_notifications").notNull().default(true),
+    quizNotifications: boolean("quiz_notifications").notNull().default(true),
+    scheduleNotifications: boolean("schedule_notifications").notNull().default(true),
+    photoReviewNotifications: boolean("photo_review_notifications").notNull().default(true),
+    announcementNotifications: boolean("announcement_notifications").notNull().default(true),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+);
+
+export const notificationEventConsumptions = pgTable(
+  "notification_event_consumptions",
+  {
+    domainEventId: uuid("domain_event_id").primaryKey().references(() => domainEvents.id, { onDelete: "cascade" }),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }).notNull().defaultNow(),
+    attempts: integer("attempts").notNull().default(1),
+    lastError: text("last_error"),
+  },
+);
+
+export const notificationOutbox = pgTable(
+  "notification_outbox",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    notificationId: uuid("notification_id").notNull().references(() => notifications.id, { onDelete: "cascade" }),
+    deviceId: uuid("device_id").notNull().references(() => pushDevices.id, { onDelete: "cascade" }),
+    channel: text("channel").notNull().default("push"),
+    status: notificationOutboxStatusEnum("status").notNull().default("pending"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    providerTicketId: text("provider_ticket_id"),
+    providerReceiptId: text("provider_receipt_id"),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("notification_outbox_notification_device_unique").on(table.notificationId, table.deviceId),
+    index("notification_outbox_claim_idx").on(table.status, table.nextAttemptAt, table.createdAt),
+    index("notification_outbox_ticket_idx").on(table.providerTicketId),
+  ],
+);
+
+export const notificationDeliveryAttempts = pgTable(
+  "notification_delivery_attempts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    outboxId: uuid("outbox_id").notNull().references(() => notificationOutbox.id, { onDelete: "cascade" }),
+    attemptNumber: integer("attempt_number").notNull(),
+    status: text("status").notNull(),
+    errorCode: text("error_code"),
+    providerTicketId: text("provider_ticket_id"),
+    providerReceiptId: text("provider_receipt_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("notification_delivery_attempts_number_unique").on(table.outboxId, table.attemptNumber),
+    index("notification_delivery_attempts_outbox_created_idx").on(table.outboxId, table.createdAt),
+  ],
+);
+
+export const announcements = pgTable(
+  "announcements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    status: announcementStatusEnum("status").notNull().default("draft"),
+    requiresAcknowledgement: boolean("requires_acknowledgement").notNull().default(false),
+    createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    publishedBy: uuid("published_by").references(() => users.id, { onDelete: "restrict" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("announcements_status_created_idx").on(table.status, table.createdAt)],
+);
+
+export const announcementStoreTargets = pgTable(
+  "announcement_store_targets",
+  {
+    announcementId: uuid("announcement_id").notNull().references(() => announcements.id, { onDelete: "cascade" }),
+    storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "restrict" }),
+  },
+  (table) => [primaryKey({ columns: [table.announcementId, table.storeId] }), index("announcement_store_targets_store_idx").on(table.storeId)],
+);
+
+export const announcementRoleTargets = pgTable(
+  "announcement_role_targets",
+  {
+    announcementId: uuid("announcement_id").notNull().references(() => announcements.id, { onDelete: "cascade" }),
+    role: userRoleEnum("role").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.announcementId, table.role] })],
+);
+
+export const announcementHistory = pgTable(
+  "announcement_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    announcementId: uuid("announcement_id").notNull().references(() => announcements.id, { onDelete: "cascade" }),
+    actorId: uuid("actor_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    action: text("action").notNull(),
+    before: jsonb("before"),
+    after: jsonb("after"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("announcement_history_announcement_created_idx").on(table.announcementId, table.createdAt)],
 );
 
 export const sessions = pgTable(

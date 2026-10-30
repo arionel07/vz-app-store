@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { getAvailableQuiz, getCurrentUser, getMyProfile, listAvailableQuizzes, listMyAttempts, mobileLogin, redeemActivation, resolveApiOrigin, startQuizAttempt, submitQuizAttempt, uploadPhoto, uploadQuizAnswerPhoto } from '../src/api/client'
+import { getAvailableQuiz, getCurrentUser, getMyProfile, getNotificationUnreadCount, listMyNotifications, listAvailableQuizzes, listMyAttempts, mobileLogin, redeemActivation, registerPushDevice, resolveApiOrigin, startQuizAttempt, submitQuizAttempt, uploadPhoto, uploadQuizAnswerPhoto } from '../src/api/client'
 import { mobileLoginErrorMessage } from '../src/auth/login-errors'
 
 process.env.EXPO_PUBLIC_API_URL ??= 'http://127.0.0.1:3000'
@@ -216,5 +216,18 @@ describe('mobile API client', () => {
 			return new Response(JSON.stringify(photo), { status: 201 })
 		}) as typeof fetch
 		expect(await uploadQuizAnswerPhoto('access-token', attempt.id, quiz.questions[0].id, { uri: 'file:///answer.jpg', name: 'answer.jpg', type: 'image/jpeg' }, 'quiz-photo-key')).toEqual(photo)
+	})
+
+	test('uses typed inbox, unread count and device registration endpoints', async () => {
+		const notification = { id: '88888888-8888-4888-8888-888888888888', eventType: 'task.assigned', category: 'task' as const, title: 'Новое задание', body: 'Проверьте полку', target: { kind: 'task' as const, id: quiz.id }, requiresAcknowledgement: false, readAt: null, acknowledgedAt: null, createdAt: '2026-01-01T00:00:00.000Z' }
+		globalThis.fetch = (async (input, init) => {
+			expect(init?.headers).toMatchObject({ Authorization: 'Bearer access-token' })
+			if (String(input).includes('unread-count')) return new Response(JSON.stringify({ count: 1 }))
+			if (String(input).includes('push-devices')) return new Response(JSON.stringify({ id: '99999999-9999-4999-8999-999999999999', deviceId: 'device-a', platform: 'ios', createdAt: notification.createdAt, lastSeenAt: notification.createdAt }), { status: 201 })
+			return new Response(JSON.stringify({ data: [notification], pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 }, unreadCount: 1 }))
+		}) as typeof fetch
+		expect((await listMyNotifications('access-token')).data[0]?.target?.kind).toBe('task')
+		expect(await getNotificationUnreadCount('access-token')).toEqual({ count: 1 })
+		expect((await registerPushDevice('access-token', { deviceId: 'device-a', platform: 'ios', expoPushToken: 'ExponentPushToken[test]' })).platform).toBe('ios')
 	})
 })

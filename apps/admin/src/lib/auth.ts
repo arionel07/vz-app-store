@@ -29,6 +29,7 @@ const MANAGEMENT_API_PREFIXES = [
 	'/api/v1/management/task-reviews',
 	'/api/v1/management/task-submissions',
 	'/api/v1/management/task-recurrences',
+	'/api/v1/management/announcements',
 	'/api/v1/task-evidence',
 ]
 const ACTIVATION_API_PREFIX = '/api/v1/auth/activation'

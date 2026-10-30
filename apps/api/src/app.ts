@@ -19,6 +19,7 @@ import {
   type PrincipalResolver,
 } from "./routes/management";
 import { registerTaskRoutes, type TaskRoutesOptions } from "./routes/tasks";
+import { registerNotificationRoutes, type NotificationRoutesOptions } from "./routes/notifications";
 
 export interface AppDependencies {
   db: {
@@ -32,6 +33,7 @@ export interface AppDependencies {
   photoRoutes?: PhotoRoutesOptions;
   dashboardRoutes?: DashboardRoutesOptions;
   taskRoutes?: TaskRoutesOptions;
+  notificationRoutes?: NotificationRoutesOptions;
   logger?: Logger;
 }
 
@@ -46,6 +48,7 @@ export function createApp({
   photoRoutes,
   dashboardRoutes,
   taskRoutes,
+  notificationRoutes,
 }: AppDependencies) {
   const app = new Hono();
 
@@ -108,6 +111,7 @@ export function createApp({
   if (photoRoutes) registerPhotoRoutes(app, photoRoutes);
   if (dashboardRoutes) registerDashboardRoutes(app, dashboardRoutes);
   if (taskRoutes) registerTaskRoutes(app, taskRoutes);
+  if (notificationRoutes) registerNotificationRoutes(app, notificationRoutes);
 
   app.notFound((context) => {
     const response = errorResponseSchema.parse({

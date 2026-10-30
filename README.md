@@ -76,7 +76,7 @@ bun run db:migrate    # apply migrations to DATABASE_URL
 bun run auth:bootstrap-admin  # interactively create the first administrator
 ```
 
-The project intentionally does not include Redis, queues, microservices, deployment configuration, or push automation yet.
+The project intentionally does not include Redis, a separate broker, microservices, or deployment configuration. Notifications use the PostgreSQL outbox worker described in [`docs/notifications.md`](docs/notifications.md).
 
 Production configuration, backup/restore, reverse-proxy, S3, and reconciliation procedures are documented in [`docs/production-readiness.md`](docs/production-readiness.md). No production credentials or external S3 verification are included in this repository.
 
@@ -90,7 +90,7 @@ Schedule times are entered as local wall-clock values and stored with UTC instan
 
 ## Tasks and checklists
 
-Milestone 16 adds explicit retail tasks. Admins and managers create versioned templates or assign one-time tasks to eligible employees, stores, or roles within their scope. Employees see only their assigned occurrences in Mobile, complete independent checklist snapshots, attach private evidence when required, and submit for review. The API enforces `assigned → in_progress → submitted → checked/rejected`, requires a rejection comment, prevents self-approval, keeps immutable history, and supports explicit idempotent daily/weekly/monthly recurrence generation. Task evidence is stored separately from photo reports and is never returned as an object key or public URL. No notification worker is included.
+Milestone 16 adds explicit retail tasks. Admins and managers create versioned templates or assign one-time tasks to eligible employees, stores, or roles within their scope. Employees see only their assigned occurrences in Mobile, complete independent checklist snapshots, attach private evidence when required, and submit for review. The API enforces `assigned → in_progress → submitted → checked/rejected`, requires a rejection comment, prevents self-approval, keeps immutable history, and supports explicit idempotent daily/weekly/monthly recurrence generation. Task evidence is stored separately from photo reports and is never returned as an object key or public URL. Milestone 17 adds the PostgreSQL-backed notification inbox, explicit Expo push registration, bounded outbox worker, and scoped announcements; see `docs/notifications.md` for startup and security details.
 
 ## Authentication
 

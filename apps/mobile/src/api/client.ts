@@ -40,6 +40,18 @@ import {
 	type TaskResponse,
 	type TaskChecklistUpdate,
 	type TaskSubmit,
+	notificationListResponseSchema,
+	notificationUnreadResponseSchema,
+	notificationResponseSchema,
+	notificationPreferencesSchema,
+	pushDeviceRegistrationSchema,
+	pushDeviceResponseSchema,
+	announcementRecipientResponseSchema,
+	type NotificationListQuery,
+	type NotificationResponse,
+	type NotificationPreferences,
+	type PushDeviceRegistration,
+	type AnnouncementRecipientResponse,
 } from '@vizaje/contracts'
 
 const REQUEST_TIMEOUT_MS = 10_000
@@ -99,7 +111,7 @@ type ResponseSchema<T> = {
 }
 
 type RequestOptions = {
-	method?: 'GET' | 'POST' | 'PATCH'
+	method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
 	token?: string
 	body?: unknown
 	idempotencyKey?: string
@@ -426,4 +438,43 @@ export async function downloadTaskEvidence(token: string, evidence: Pick<TaskRes
 		if (error instanceof ApiError) throw error
 		throw new ApiError(0, 'NETWORK_UNAVAILABLE', 'Сервис временно недоступен')
 	}
+}
+
+export function listMyNotifications(token: string, query: NotificationListQuery = { page: 1, pageSize: 30 }): Promise<{ data: NotificationResponse[]; pagination: { page: number; pageSize: number; total: number; totalPages: number }; unreadCount: number }> {
+	const params = new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize) })
+	if (query.unreadOnly !== undefined) params.set('unreadOnly', String(query.unreadOnly))
+	return requestJson(`/api/v1/me/notifications?${params.toString()}`, notificationListResponseSchema, { token, allowRetry: true })
+}
+
+export function getNotificationUnreadCount(token: string): Promise<{ count: number }> {
+	return requestJson('/api/v1/me/notifications/unread-count', notificationUnreadResponseSchema, { token, allowRetry: true })
+}
+
+export function markNotificationRead(token: string, notificationId: string): Promise<NotificationResponse> {
+	return requestJson(`/api/v1/me/notifications/${encodeURIComponent(notificationId)}/read`, notificationResponseSchema, { method: 'POST', token })
+}
+
+export function acknowledgeNotification(token: string, notificationId: string): Promise<NotificationResponse> {
+	return requestJson(`/api/v1/me/notifications/${encodeURIComponent(notificationId)}/acknowledge`, notificationResponseSchema, { method: 'POST', token })
+}
+
+export function getNotificationPreferences(token: string): Promise<NotificationPreferences> {
+	return requestJson('/api/v1/me/notification-preferences', notificationPreferencesSchema, { token, allowRetry: true })
+}
+
+export function updateNotificationPreferences(token: string, input: Partial<NotificationPreferences>): Promise<NotificationPreferences> {
+	return requestJson('/api/v1/me/notification-preferences', notificationPreferencesSchema, { method: 'PATCH', token, body: input })
+}
+
+export function registerPushDevice(token: string, input: PushDeviceRegistration): Promise<{ id: string; deviceId: string; platform: 'ios' | 'android'; createdAt: string; lastSeenAt: string }> {
+	const body = pushDeviceRegistrationSchema.parse(input)
+	return requestJson('/api/v1/me/push-devices', pushDeviceResponseSchema, { method: 'POST', token, body })
+}
+
+export function removePushDevice(token: string, deviceId: string): Promise<{ success: true }> {
+	return requestJson(`/api/v1/me/push-devices/${encodeURIComponent(deviceId)}`, logoutResponseSchema, { method: 'DELETE', token })
+}
+
+export function getMyAnnouncement(token: string, announcementId: string): Promise<AnnouncementRecipientResponse> {
+	return requestJson(`/api/v1/me/announcements/${encodeURIComponent(announcementId)}`, announcementRecipientResponseSchema, { token, allowRetry: true })
 }

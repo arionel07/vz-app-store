@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { authRedirect, goBackOrReplace, type SafeNavigation } from '../src/navigation/safe-navigation'
+import { notificationTargetHref } from '../src/notifications/navigation'
 
 function navigation(canGoBack: boolean) {
 	const actions: string[] = []
@@ -50,5 +51,13 @@ describe('mobile navigation safety', () => {
 		// Login submission is local state; the auth guard must continue rendering
 		// the unauthenticated activation route until a session is established.
 		expect(authRedirect('unauthenticated', 'activation')).toBeNull()
+	})
+
+	test('keeps notification deep links on an explicit allowlist', () => {
+		expect(notificationTargetHref({ kind: 'task', id: '11111111-1111-4111-8111-111111111111' })).toBe('/task/11111111-1111-4111-8111-111111111111')
+		expect(notificationTargetHref({ kind: 'photo_report', id: '11111111-1111-4111-8111-111111111111' })).toBe('/(tabs)/photos')
+		expect(notificationTargetHref({ kind: 'announcement', id: '11111111-1111-4111-8111-111111111111' })).toBe('/announcement/11111111-1111-4111-8111-111111111111')
+		expect(authRedirect('unauthenticated', 'notifications')).toBe('/activation')
+		expect(authRedirect('authenticated', 'announcement')).toBeNull()
 	})
 })

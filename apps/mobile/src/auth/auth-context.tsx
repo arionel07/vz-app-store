@@ -18,6 +18,7 @@ import {
 	type StoredSession,
 } from './session-store'
 import type { MobileSessionResponse, StoreResponse, UserResponse } from '@vizaje/contracts'
+import { unregisterCurrentPushDevice } from '../notifications/registration'
 
 export type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated' | 'offline' | 'storage-error'
 export type LoginSubmissionStatus = 'idle' | 'submitting'
@@ -231,6 +232,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
 		const current = sessionRef.current
 		let remoteRevoked = false
 		if (current) {
+			try {
+				await unregisterCurrentPushDevice(current.accessToken)
+			} catch {
+				// Device removal is best-effort; the session is still revoked below.
+			}
 			try {
 				await logoutMobileSession(current.accessToken)
 				remoteRevoked = true

@@ -14,6 +14,7 @@ import { createTasksService } from "../domain/tasks/service";
 import { createLogger } from "../lib/logger";
 import { createPhotoStorage } from "../storage/photo-storage";
 import { createShutdownHandler } from "./shutdown";
+import { createNotificationsService } from "../domain/notifications/service";
 
 export function startServer() {
   const env = loadEnv();
@@ -30,6 +31,7 @@ export function startServer() {
   }, logger);
   const dashboard = createDashboardService(db);
   const usersService = createUsersService(db);
+  const notifications = createNotificationsService(db);
   const app = createApp({
     db,
     allowedOrigins: env.CORS_ALLOWED_ORIGINS,
@@ -68,6 +70,10 @@ export function startServer() {
       }, logger),
       resolvePrincipal: auth.principalResolver(),
       maxUploadBytes: env.PHOTO_MAX_BYTES,
+    },
+    notificationRoutes: {
+      notifications,
+      resolvePrincipal: auth.principalResolver(),
     },
     logger,
   });

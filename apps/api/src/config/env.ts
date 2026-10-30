@@ -62,6 +62,10 @@ const envSchema = z.object({
   S3_ACCESS_KEY_ID: z.string().min(1).optional(),
   S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
+  EXPO_PUSH_ACCESS_TOKEN: z.string().min(1).optional(),
+  NOTIFICATION_WORKER_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(100),
+  NOTIFICATION_WORKER_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(6),
+  NOTIFICATION_WORKER_POLL_MS: z.coerce.number().int().min(1000).max(300000).default(5000),
 });
 
 type ParsedEnv = z.infer<typeof envSchema>;
