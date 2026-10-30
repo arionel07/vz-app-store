@@ -8,9 +8,10 @@ export const notificationTargetSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("attempt"), id: z.string().uuid() }),
   z.object({ kind: z.literal("schedule"), id: z.string().uuid() }),
   z.object({ kind: z.literal("announcement"), id: z.string().uuid() }),
+  z.object({ kind: z.literal("knowledge"), id: z.string().uuid() }),
 ]);
 
-export const notificationCategorySchema = z.enum(["task", "quiz", "schedule", "photo", "announcement"]);
+export const notificationCategorySchema = z.enum(["task", "quiz", "schedule", "photo", "announcement", "knowledge"]);
 export const notificationListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(30),

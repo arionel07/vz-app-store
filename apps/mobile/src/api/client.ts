@@ -47,6 +47,14 @@ import {
 	pushDeviceRegistrationSchema,
 	pushDeviceResponseSchema,
 	announcementRecipientResponseSchema,
+	knowledgeCategoryListResponseSchema,
+	knowledgeStaffListResponseSchema,
+	knowledgeStaffArticleResponseSchema,
+	knowledgeAcknowledgmentResponseSchema,
+	type KnowledgeStaffListQuery,
+	type KnowledgeStaffListResponse,
+	type KnowledgeStaffArticleResponse,
+	type KnowledgeAttachmentResponse,
 	type NotificationListQuery,
 	type NotificationResponse,
 	type NotificationPreferences,
@@ -191,6 +199,23 @@ export function getCurrentUser(token: string): Promise<UserResponse> {
 
 export function getMyProfile(token: string): Promise<EmployeeProfileSafeResponse> {
 	return requestJson('/api/v1/me/profile', employeeProfileSafeResponseSchema, { token, allowRetry: true })
+}
+
+export function listKnowledgeCategories(token: string) {
+	return requestJson('/api/v1/me/knowledge/categories', knowledgeCategoryListResponseSchema, { token, allowRetry: true })
+}
+
+export function listKnowledgeArticles(token: string, query: KnowledgeStaffListQuery = { page: 1, pageSize: 20 }): Promise<KnowledgeStaffListResponse> {
+	const params = new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize), ...(query.search ? { search: query.search } : {}), ...(query.categoryId ? { categoryId: query.categoryId } : {}) })
+	return requestJson(`/api/v1/me/knowledge/articles?${params.toString()}`, knowledgeStaffListResponseSchema, { token, allowRetry: true })
+}
+
+export function getKnowledgeArticle(token: string, articleId: string): Promise<KnowledgeStaffArticleResponse> {
+	return requestJson(`/api/v1/me/knowledge/articles/${encodeURIComponent(articleId)}`, knowledgeStaffArticleResponseSchema, { token, allowRetry: true })
+}
+
+export function acknowledgeKnowledgeArticle(token: string, articleId: string) {
+	return requestJson(`/api/v1/me/knowledge/articles/${encodeURIComponent(articleId)}/acknowledge`, knowledgeAcknowledgmentResponseSchema, { method: 'POST', token })
 }
 
 export function getMySchedule(token: string, from: string, to: string): Promise<StaffScheduleResponse> {
@@ -432,6 +457,24 @@ export async function downloadTaskEvidence(token: string, evidence: Pick<TaskRes
 		if (result.status < 200 || result.status >= 300) {
 			await FileSystem.deleteAsync(result.uri, { idempotent: true }).catch(() => undefined)
 			throw new ApiError(result.status, result.status === 401 ? 'UNAUTHENTICATED' : result.status === 404 ? 'EVIDENCE_NOT_FOUND' : 'EVIDENCE_DOWNLOAD_FAILED', 'Не удалось загрузить фото задания')
+		}
+		return result.uri
+	} catch (error) {
+		if (error instanceof ApiError) throw error
+		throw new ApiError(0, 'NETWORK_UNAVAILABLE', 'Сервис временно недоступен')
+	}
+}
+
+export async function downloadKnowledgeAttachment(token: string, articleId: string, attachment: Pick<KnowledgeAttachmentResponse, 'id' | 'mimeType'>): Promise<string> {
+	const FileSystem = await import('expo-file-system/legacy')
+	if (!FileSystem.cacheDirectory) throw new ApiError(0, 'CACHE_UNAVAILABLE', 'Временное хранилище недоступно')
+	const extension = attachment.mimeType === 'application/pdf' ? 'pdf' : attachment.mimeType === 'image/png' ? 'png' : attachment.mimeType === 'image/webp' ? 'webp' : 'jpg'
+	const target = `${FileSystem.cacheDirectory}vizaje-knowledge-${encodeURIComponent(attachment.id)}.${extension}`
+	try {
+		const result = await FileSystem.downloadAsync(`${apiOrigin()}/api/v1/me/knowledge/articles/${encodeURIComponent(articleId)}/attachments/${encodeURIComponent(attachment.id)}`, target, { headers: { Authorization: `Bearer ${token}`, Accept: attachment.mimeType } })
+		if (result.status < 200 || result.status >= 300) {
+			await FileSystem.deleteAsync(result.uri, { idempotent: true }).catch(() => undefined)
+			throw new ApiError(result.status, result.status === 401 ? 'UNAUTHENTICATED' : result.status === 404 ? 'KNOWLEDGE_ATTACHMENT_NOT_FOUND' : 'KNOWLEDGE_ATTACHMENT_DOWNLOAD_FAILED', 'Не удалось загрузить вложение')
 		}
 		return result.uri
 	} catch (error) {

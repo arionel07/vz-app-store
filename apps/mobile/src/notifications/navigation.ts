@@ -7,6 +7,7 @@ export function notificationTargetHref(target: NotificationTarget): Href {
 	if (target.kind === 'attempt') return `/attempt/${target.id}` as Href
 	if (target.kind === 'schedule') return '/schedule'
 	if (target.kind === 'photo_report') return '/(tabs)/photos'
+	if (target.kind === 'knowledge') return `/knowledge/${target.id}` as Href
 	return `/announcement/${target.id}` as Href
 }
 

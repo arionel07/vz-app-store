@@ -18,6 +18,7 @@ import {
   userStores,
   users,
   stores,
+  knowledgeVisibilityTargets,
 } from "../../db/schema";
 import type { Database } from "../../db/client";
 import {
@@ -59,6 +60,7 @@ function categoryForEvent(eventType: string): NotificationCategory | null {
   if (eventType.startsWith("quiz.")) return "quiz";
   if (eventType.startsWith("schedule.")) return "schedule";
   if (eventType.startsWith("photo.")) return "photo";
+  if (eventType.startsWith("knowledge.")) return "knowledge";
   if (eventType === "announcement.published") return "announcement";
   return null;
 }
@@ -274,6 +276,13 @@ export class NotificationsService {
     const payload = asPayload(event.payload);
     const category = categoryForEvent(event.eventType);
     if (!category || event.eventType === "announcement.published") return [];
+    if (event.eventType === "knowledge.published") {
+      const articleId = payloadId(payload, "articleId");
+      if (!articleId) return [];
+      const targets = await tx.select().from(knowledgeVisibilityTargets).where(eq(knowledgeVisibilityTargets.articleId, articleId));
+      const recipients = await this.resolveKnowledgeRecipients(tx, targets);
+      return recipients.map((recipientId) => ({ recipientId, sourceEventId: event.id, eventType: event.eventType, category, title: "Новый материал в базе знаний", body: "Вам доступен новый обучающий материал.", target: target("knowledge", articleId), requiresAcknowledgement: Boolean(payload.requiresAcknowledgement) }));
+    }
     const taskId = payloadId(payload, "taskId") ?? (event.aggregateType === "task" ? event.aggregateId : null);
     if (event.eventType === "task.assigned" && taskId) {
       const recipientId = payloadId(payload, "assignedEmployeeId");
@@ -372,6 +381,23 @@ export class NotificationsService {
     const scopeFilter = storeIds.length ? (roles.includes("admin") ? or(eq(users.role, "admin"), inArray(userStores.storeId, storeIds)) : inArray(userStores.storeId, storeIds)) : undefined;
     const rows = await tx.selectDistinct({ id: users.id }).from(users).leftJoin(userStores, eq(userStores.userId, users.id)).where(and(eq(users.isActive, true), roleFilter, scopeFilter));
     return rows.map((row: { id: string }) => row.id);
+  }
+
+  private async resolveKnowledgeRecipients(tx: DbContext, targets: Array<typeof knowledgeVisibilityTargets.$inferSelect>): Promise<string[]> {
+    const recipients: string[] = [];
+    for (const targetRow of targets) {
+      if (targetRow.kind === "all") {
+        const rows = await tx.select({ id: users.id }).from(users).where(and(eq(users.role, "staff"), eq(users.isActive, true)));
+        recipients.push(...rows.map((row: { id: string }) => row.id));
+        continue;
+      }
+      const role = targetRow.role ?? "staff";
+      const conditions = [eq(users.role, role), eq(users.isActive, true)];
+      if (targetRow.storeId) conditions.push(eq(userStores.storeId, targetRow.storeId));
+      const rows = await tx.selectDistinct({ id: users.id }).from(users).innerJoin(userStores, eq(userStores.userId, users.id)).where(and(...conditions));
+      recipients.push(...rows.map((row: { id: string }) => row.id));
+    }
+    return distinct(recipients);
   }
 
   private async announcementDto(row: typeof announcements.$inferSelect): Promise<AnnouncementResponse> {

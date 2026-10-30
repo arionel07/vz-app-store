@@ -10,7 +10,7 @@ import { requestAndRegisterPushDevice } from '../src/notifications/registration'
 import { useAppTheme } from '../src/theme'
 import type { NotificationPreferences, NotificationResponse } from '@vizaje/contracts'
 
-const categoryLabels = { task: 'Задание', quiz: 'Тест', schedule: 'Расписание', photo: 'Фото', announcement: 'Объявление' } as const
+const categoryLabels = { task: 'Задание', quiz: 'Тест', schedule: 'Расписание', photo: 'Фото', announcement: 'Объявление', knowledge: 'База знаний' } as const
 const preferenceLabels: Array<{ key: keyof NotificationPreferences; label: string }> = [
 	{ key: 'pushEnabled', label: 'Push-уведомления' },
 	{ key: 'taskNotifications', label: 'Задания' },

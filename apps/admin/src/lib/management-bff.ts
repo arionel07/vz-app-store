@@ -39,7 +39,7 @@ export async function proxyManagement<T>(
 	request: Request,
 	path: string,
 	schema: { safeParse(value: unknown): { success: true; data: T } | { success: false } },
-	options: { method: BffFetchOptions['method']; body?: string } = { method: 'GET' },
+	options: { method: BffFetchOptions['method']; body?: BodyInit | null } = { method: 'GET' },
 ): Promise<NextResponse> {
 	try {
 		const upstream = await fetchManagementApi(path, getManagementRequestOptions(request, { ...options, method: options.method ?? 'GET' }))
@@ -53,7 +53,7 @@ export async function proxyManagement<T>(
 	}
 }
 
-export async function proxyManagementNoContent(request: Request, path: string, options: { method: BffFetchOptions['method']; body?: string }): Promise<NextResponse> {
+export async function proxyManagementNoContent(request: Request, path: string, options: { method: BffFetchOptions['method']; body?: BodyInit | null }): Promise<NextResponse> {
 	try {
 		const upstream = await fetchManagementApi(path, getManagementRequestOptions(request, { ...options, method: options.method ?? 'GET' }))
 		if (upstream.ok) return new NextResponse(null, { status: upstream.status, headers: { 'Cache-Control': 'private, no-store, max-age=0', Pragma: 'no-cache', Vary: 'Cookie' } })

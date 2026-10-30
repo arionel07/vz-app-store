@@ -6,6 +6,7 @@ import { POST as activate } from '../src/app/api/admin/activation/route'
 import { POST as setPassword } from '../src/app/api/admin/employees/[id]/password/route'
 import { GET as getEmployeeProfile, PATCH as updateEmployeeProfile } from '../src/app/api/admin/employees/[id]/profile/route'
 import { POST as createAnnouncement } from '../src/app/api/admin/announcements/route'
+import { GET as getKnowledgeCategories } from '../src/app/api/admin/knowledge/categories/route'
 
 const originalFetch = globalThis.fetch
 const apiUrl = 'http://127.0.0.1:3000'
@@ -48,6 +49,7 @@ const announcement = {
 	id: '00000000-0000-4000-8000-000000000003', title: 'Важная новость', body: 'Текст объявления', status: 'draft', storeIds: [storeId], roles: ['staff'], requiresAcknowledgement: true,
 	createdBy: userId, publishedBy: null, publishedAt: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', metrics: { recipientCount: 0, readCount: 0, acknowledgedCount: 0 },
 }
+const knowledgeCategory = { id: '00000000-0000-4000-8000-000000000004', name: 'Продукция', slug: 'produkciya', description: null, parentId: null, sortOrder: 20, isActive: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }
 
 function upstream(status: number, payload: unknown): Response {
 	return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } })
@@ -209,5 +211,17 @@ describe('management BFF', () => {
 		expect(target).toContain('/api/v1/management/announcements')
 		expect(new Headers(captured?.headers).get('cookie')).toBe('vizaje_session=session')
 		expect(new Headers(captured?.headers).get('x-csrf-token')).toBe('csrf')
+	})
+
+	test('keeps knowledge management allowlisted, typed and cookie-scoped', async () => {
+		process.env.VIZAJE_API_URL = apiUrl
+		let target = ''
+		let captured: RequestInit | undefined
+		globalThis.fetch = (async (input, init) => { target = String(input); captured = init; return upstream(200, { data: [knowledgeCategory] }) }) as typeof fetch
+		const response = await getKnowledgeCategories(request('/api/admin/knowledge/categories', { headers: { cookie: 'vizaje_session=session; tracking=secret' } }))
+		expect(response.status).toBe(200)
+		expect(target).toContain('/api/v1/management/knowledge/categories')
+		expect(new Headers(captured?.headers).get('cookie')).toBe('vizaje_session=session')
+		expect(response.headers.get('cache-control')).toContain('no-store')
 	})
 })

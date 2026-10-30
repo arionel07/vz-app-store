@@ -26,7 +26,7 @@ export async function managementFetch<T>(
 ): Promise<T> {
 	const headers = new Headers(options.headers)
 	headers.set('Accept', 'application/json')
-	if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+	if (options.body && typeof options.body === 'string' && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
 	if (options.method && !['GET', 'HEAD'].includes(options.method.toUpperCase())) {
 		const csrfToken = getBrowserCsrfToken()
 		if (csrfToken) headers.set('X-CSRF-Token', csrfToken)

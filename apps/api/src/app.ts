@@ -20,6 +20,7 @@ import {
 } from "./routes/management";
 import { registerTaskRoutes, type TaskRoutesOptions } from "./routes/tasks";
 import { registerNotificationRoutes, type NotificationRoutesOptions } from "./routes/notifications";
+import { registerKnowledgeRoutes, type KnowledgeRoutesOptions } from "./routes/knowledge";
 
 export interface AppDependencies {
   db: {
@@ -34,6 +35,7 @@ export interface AppDependencies {
   dashboardRoutes?: DashboardRoutesOptions;
   taskRoutes?: TaskRoutesOptions;
   notificationRoutes?: NotificationRoutesOptions;
+  knowledgeRoutes?: KnowledgeRoutesOptions;
   logger?: Logger;
 }
 
@@ -49,6 +51,7 @@ export function createApp({
   dashboardRoutes,
   taskRoutes,
   notificationRoutes,
+  knowledgeRoutes,
 }: AppDependencies) {
   const app = new Hono();
 
@@ -112,6 +115,7 @@ export function createApp({
   if (dashboardRoutes) registerDashboardRoutes(app, dashboardRoutes);
   if (taskRoutes) registerTaskRoutes(app, taskRoutes);
   if (notificationRoutes) registerNotificationRoutes(app, notificationRoutes);
+  if (knowledgeRoutes) registerKnowledgeRoutes(app, knowledgeRoutes);
 
   app.notFound((context) => {
     const response = errorResponseSchema.parse({

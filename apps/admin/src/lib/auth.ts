@@ -30,6 +30,7 @@ const MANAGEMENT_API_PREFIXES = [
 	'/api/v1/management/task-submissions',
 	'/api/v1/management/task-recurrences',
 	'/api/v1/management/announcements',
+	'/api/v1/management/knowledge',
 	'/api/v1/task-evidence',
 ]
 const ACTIVATION_API_PREFIX = '/api/v1/auth/activation'
@@ -94,7 +95,7 @@ type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export interface BffFetchOptions {
 	method?: ApiMethod
-	body?: string
+	body?: BodyInit | null
 	cookieHeader?: string | null
 	csrfToken?: string | null
 	idempotencyKey?: string | null
@@ -104,7 +105,7 @@ export interface BffFetchOptions {
 export async function fetchBffApi(path: string, options: BffFetchOptions = {}): Promise<Response> {
 	const method = options.method ?? 'GET'
 	const headers = new Headers({ Accept: 'application/json' })
-	if (options.body) headers.set('Content-Type', 'application/json')
+	if (typeof options.body === 'string') headers.set('Content-Type', 'application/json')
 	if (options.cookieHeader) headers.set('Cookie', options.cookieHeader)
 	if (options.csrfToken) headers.set('X-CSRF-Token', options.csrfToken)
 	if (options.idempotencyKey) headers.set('Idempotency-Key', options.idempotencyKey)
@@ -135,7 +136,7 @@ export async function fetchManagementApi(path: string, options: BffFetchOptions 
 	cookie is copied to the upstream API. The BFF never forwards arbitrary
 	cookies or exposes the session token to client JavaScript.
 */
-export function getManagementRequestOptions(request: Request, options: { body?: string; method: ApiMethod }): BffFetchOptions {
+export function getManagementRequestOptions(request: Request, options: { body?: BodyInit | null; method: ApiMethod }): BffFetchOptions {
 	return {
 		method: options.method,
 		body: options.body,
@@ -151,7 +152,7 @@ export function getManagementRequestOptions(request: Request, options: { body?: 
 	avoids accidental widening of cookie forwarding if a new browser cookie is
 	added later.
 */
-export function getAuthRequestOptions(request: Request, options: { body?: string; method: ApiMethod }): BffFetchOptions {
+export function getAuthRequestOptions(request: Request, options: { body?: BodyInit | null; method: ApiMethod }): BffFetchOptions {
 	return {
 		method: options.method,
 		body: options.body,
@@ -248,14 +249,14 @@ export function managementUnavailableResponse(): NextResponse {
 	return jsonError(503, 'MANAGEMENT_BACKEND_UNAVAILABLE', 'Сервис управления временно недоступен')
 }
 
-export async function forwardBffBinaryResponse(upstream: Response): Promise<NextResponse> {
+export async function forwardBffBinaryResponse(upstream: Response, options: { fallbackErrorCode?: string; fallbackErrorMessage?: string } = {}): Promise<NextResponse> {
 	if (!upstream.ok) {
 		const payload = await readJson(upstream)
 		const parsedError = errorResponseSchema.safeParse(payload)
 		return NextResponse.json(
 			parsedError.success
 				? parsedError.data
-				: errorResponseSchema.parse({ error: { code: upstream.status === 401 ? 'UNAUTHENTICATED' : 'PHOTO_REQUEST_FAILED', message: 'Не удалось получить фотографию' } }),
+				: errorResponseSchema.parse({ error: { code: upstream.status === 401 ? 'UNAUTHENTICATED' : options.fallbackErrorCode ?? 'PHOTO_REQUEST_FAILED', message: options.fallbackErrorMessage ?? 'Не удалось получить фотографию' } }),
 			{ status: upstream.status, headers: NO_STORE_HEADERS },
 		)
 	}

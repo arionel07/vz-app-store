@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { getAvailableQuiz, getCurrentUser, getMyProfile, getNotificationUnreadCount, listMyNotifications, listAvailableQuizzes, listMyAttempts, mobileLogin, redeemActivation, registerPushDevice, resolveApiOrigin, startQuizAttempt, submitQuizAttempt, uploadPhoto, uploadQuizAnswerPhoto } from '../src/api/client'
+import { acknowledgeKnowledgeArticle, getAvailableQuiz, getCurrentUser, getMyProfile, getNotificationUnreadCount, listKnowledgeArticles, listMyNotifications, listAvailableQuizzes, listMyAttempts, mobileLogin, redeemActivation, registerPushDevice, resolveApiOrigin, startQuizAttempt, submitQuizAttempt, uploadPhoto, uploadQuizAnswerPhoto } from '../src/api/client'
 import { mobileLoginErrorMessage } from '../src/auth/login-errors'
 
 process.env.EXPO_PUBLIC_API_URL ??= 'http://127.0.0.1:3000'
@@ -229,5 +229,16 @@ describe('mobile API client', () => {
 		expect((await listMyNotifications('access-token')).data[0]?.target?.kind).toBe('task')
 		expect(await getNotificationUnreadCount('access-token')).toEqual({ count: 1 })
 		expect((await registerPushDevice('access-token', { deviceId: 'device-a', platform: 'ios', expoPushToken: 'ExponentPushToken[test]' })).platform).toBe('ios')
+	})
+
+	test('uses scoped knowledge list and acknowledgement endpoints', async () => {
+		const articleId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+		globalThis.fetch = (async (input, init) => {
+			expect(init?.headers).toMatchObject({ Authorization: 'Bearer access-token' })
+			if (String(input).includes('/knowledge/articles?')) return new Response(JSON.stringify({ data: [{ id: articleId, category: { id: quiz.id, name: 'Продукция', slug: 'produkciya', description: null, parentId: null, sortOrder: 1, isActive: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }, title: 'Материал', summary: null, requiresAcknowledgement: true, acknowledgedAt: null, publishedAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }], pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 } }))
+			return new Response(JSON.stringify({ articleId, revisionId: quiz.revisionId, acknowledgedAt: '2026-01-01T00:00:00.000Z' }))
+		}) as typeof fetch
+		expect((await listKnowledgeArticles('access-token')).data[0]?.title).toBe('Материал')
+		expect((await acknowledgeKnowledgeArticle('access-token', articleId)).articleId).toBe(articleId)
 	})
 })

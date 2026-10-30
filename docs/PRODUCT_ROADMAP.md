@@ -51,7 +51,7 @@ The Drizzle schema currently contains these PostgreSQL structures:
 | Quizzes | `quizzes`, `quiz_revisions`, `quiz_questions`, `quiz_options`, `quiz_assignments` | Draft/published/archive lifecycle, revision graph and store assignment |
 | Attempts | `quiz_attempts`, `quiz_attempt_answers`, `quiz_attempt_status` | One active attempt per user/revision and server-calculated result |
 
-The Drizzle migrations are additive. Employee profiles, photo review, schedules, tasks, and notifications/outbox are implemented; knowledge base and operational campaign tables remain outside the implemented scope.
+The Drizzle migrations are additive. Employee profiles, photo review, schedules, tasks, notifications/outbox, and the knowledge base are implemented; operational campaign tables remain outside the implemented scope.
 
 The existing `users` table mixes identity/contact fields with authentication state. `password_hash` is nullable, which supports activated staff accounts that do not yet have a password. API responses correctly omit the hash. `user_stores` is the existing relationship for multi-store assignment.
 
@@ -109,7 +109,7 @@ The `photos` table remains the private immutable media record. Milestone 13 adds
 
 Admin already has pages/BFFs for overview, employees, stores, quizzes, results, and photos. The protected layout performs a server-side admin/manager check. Managers see scoped data because the API applies the scope, not because the UI hides rows.
 
-Mobile already has screens for Home, quizzes/attempts/results, photo capture/upload/history, profile, activation, login, schedules, tasks, and the notification inbox. Knowledge base and expanded employee profile fields remain future work.
+Mobile already has screens for Home, quizzes/attempts/results, photo capture/upload/history, profile, activation, login, schedules, tasks, notification inbox, and the knowledge base reader.
 
 `packages/contracts` is the shared validation boundary. It contains auth, activation, users, stores, quizzes, photos, dashboard, tasks, notifications, announcements, and health contracts. Future modules should add explicit files and exports rather than duplicating schemas in Admin, Mobile, and API.
 
@@ -143,7 +143,7 @@ Notification integration tests cover recipient scope, inbox dedupe, push deliver
 | Work schedules | Implemented | Milestone 15; timezone-aware draft/publication/history flow, Admin editor, and staff Mobile read-only schedule |
 | Tasks/checklists | Implemented | Milestone 16; scoped templates, occurrences, checklists, private evidence, review history, Admin and Mobile clients |
 | In-app/push notifications and announcements | Implemented in Milestone 17 | Milestone 18+ extensions |
-| Knowledge base | Not implemented | Milestone 18 |
+| Knowledge base | Implemented in Milestone 18 | Milestone 19+ extensions |
 | Retail operations | Not implemented | Milestone 19 |
 | Advanced reporting | Not implemented | Milestone 20 |
 
@@ -267,7 +267,7 @@ Emit events inside the same transaction as the business state change. A later wo
 
 ### 5.7 Knowledge base and operations
 
-Knowledge base should use `articles`, `article_revisions`, categories, visibility targets, attachments, and optional acknowledgements. Published revision content must be immutable and search should start with PostgreSQL full-text/trigram capabilities before introducing an external search service.
+Knowledge base uses `knowledge_articles`, immutable `knowledge_article_revisions`, categories, visibility targets, private attachments, article-to-quiz links, and per-revision acknowledgements. Published Markdown is validated as safe plain Markdown, search uses PostgreSQL full-text with a fallback substring match, and all staff reads/attachments are scope-checked server-side.
 
 Retail operations can later add campaign definitions, store execution records, reference media, submitted evidence, maintenance issues, and internal requests. These should reference the existing store/user/media identities and reuse event/audit conventions without coupling to tasks or photos.
 
@@ -517,7 +517,7 @@ Dependencies: stable domain events from photo, quiz, schedule, and task modules;
 
 Status: implemented on the SDK 58 upgrade branch. Migrations `0014_notifications` and `0015_notification_delivery_attempts` add durable inbox records, multiple push devices, preferences, event consumption, transactional outbox rows, delivery history, announcements, normalized role/store targets, and history. The API resolves active recipients from existing `domain_events`, deduplicates by event and recipient, enforces manager/admin scope, and exposes explicit Mobile and Admin/BFF routes. The worker uses PostgreSQL `SKIP LOCKED`, bounded retry/backoff, Expo ticket/receipt handling, and invalid-token invalidation. Mobile adds the authenticated inbox, contextual permission registration, logout cleanup, and allowlisted deep links. See `docs/notifications.md` for operational startup.
 
-### Milestone 18 — Knowledge base
+### Milestone 18 — Knowledge base (implemented)
 
 Dependencies: role/store visibility policy, private media attachments, optional notification/acknowledgement support.
 
@@ -617,4 +617,4 @@ These questions should be answered before implementation of the corresponding mi
 
 The current repository is not missing a backend foundation; it has a working identity/store/authentication layer, private photo storage, revisioned quizzes, results, dashboard aggregates, and explicit Admin/Mobile clients. The future work is additive domain expansion.
 
-Milestones 12–17 address employee profiles, photo review, the advanced revisioned quiz engine, work schedules, retail tasks/checklists, and notifications/announcements. Knowledge base, retail operations, and advanced reporting remain future milestones.
+Milestones 12–18 address employee profiles, photo review, the advanced revisioned quiz engine, work schedules, retail tasks/checklists, notifications/announcements, and the scoped knowledge base. Retail operations and advanced reporting remain future milestones.

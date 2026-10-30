@@ -17,7 +17,7 @@ function AuthGate({ children }: { children: ReactNode }) {
 	const segments = useSegments()
 	const navigation = useRouter()
 	const { status, retryRestore } = useAuth()
-	const protectedRoute = segments[0] === '(tabs)' || segments[0] === 'profile'
+	const protectedRoute = segments[0] === '(tabs)' || segments[0] === 'profile' || segments[0] === 'knowledge'
 	const activationRoute = segments[0] === 'activation' || segments[0] === 'activate'
 	const redirect = authRedirect(status, segments[0])
 
@@ -51,6 +51,8 @@ export default function RootLayout() {
 			<Stack.Screen name="attempt/[attemptId]" />
 			<Stack.Screen name="notifications" />
 			<Stack.Screen name="announcement/[id]" />
+			<Stack.Screen name="knowledge" />
+			<Stack.Screen name="knowledge/[id]" />
 		</Stack></AuthGate>
 	</AuthProvider></AppThemeProvider></SafeAreaProvider>
 }

@@ -15,6 +15,7 @@ import { createLogger } from "../lib/logger";
 import { createPhotoStorage } from "../storage/photo-storage";
 import { createShutdownHandler } from "./shutdown";
 import { createNotificationsService } from "../domain/notifications/service";
+import { createKnowledgeService } from "../domain/knowledge/service";
 
 export function startServer() {
   const env = loadEnv();
@@ -74,6 +75,15 @@ export function startServer() {
     notificationRoutes: {
       notifications,
       resolvePrincipal: auth.principalResolver(),
+    },
+    knowledgeRoutes: {
+      knowledge: createKnowledgeService(db, photoStorage, {
+        maxBytes: env.PHOTO_MAX_BYTES,
+        maxDimension: env.PHOTO_MAX_DIMENSION,
+        maxPixels: env.PHOTO_MAX_PIXELS,
+      }),
+      resolvePrincipal: auth.principalResolver(),
+      maxUploadBytes: env.PHOTO_MAX_BYTES,
     },
     logger,
   });

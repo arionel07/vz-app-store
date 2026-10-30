@@ -2,6 +2,7 @@ import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  type AnyPgColumn,
   date,
   integer,
   index,
@@ -33,10 +34,14 @@ export const taskPriorityEnum = pgEnum("task_priority", ["low", "normal", "high"
 export const taskStatusEnum = pgEnum("task_status", ["assigned", "in_progress", "submitted", "checked", "rejected"]);
 export const taskSubmissionStatusEnum = pgEnum("task_submission_status", ["submitted", "checked", "rejected"]);
 export const taskRecurrenceFrequencyEnum = pgEnum("task_recurrence_frequency", ["daily", "weekly", "monthly"]);
-export const notificationTargetKindEnum = pgEnum("notification_target_kind", ["task", "photo_report", "quiz", "attempt", "schedule", "announcement"]);
+export const notificationTargetKindEnum = pgEnum("notification_target_kind", ["task", "photo_report", "quiz", "attempt", "schedule", "announcement", "knowledge"]);
 export const notificationOutboxStatusEnum = pgEnum("notification_outbox_status", ["pending", "claimed", "accepted", "retry", "permanent"]);
 export const pushPlatformEnum = pgEnum("push_platform", ["ios", "android"]);
 export const announcementStatusEnum = pgEnum("announcement_status", ["draft", "published", "archived"]);
+export const knowledgeArticleStatusEnum = pgEnum("knowledge_article_status", ["draft", "published", "archived"]);
+export const knowledgeRevisionStatusEnum = pgEnum("knowledge_revision_status", ["draft", "published", "archived"]);
+export const knowledgeContentFormatEnum = pgEnum("knowledge_content_format", ["markdown"]);
+export const knowledgeVisibilityKindEnum = pgEnum("knowledge_visibility_kind", ["all", "store", "role"]);
 
 export const users = pgTable(
   "users",
@@ -968,4 +973,108 @@ export const taskReviewHistory = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("task_review_history_task_idx").on(table.taskId, table.createdAt), index("task_review_history_submission_idx").on(table.submissionId, table.createdAt)],
+);
+
+export const knowledgeCategories = pgTable(
+  "knowledge_categories",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    description: text("description"),
+    parentId: uuid("parent_id").references((): AnyPgColumn => knowledgeCategories.id, { onDelete: "restrict" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("knowledge_categories_slug_unique").on(table.slug), index("knowledge_categories_parent_idx").on(table.parentId, table.sortOrder)],
+);
+
+export const knowledgeArticles = pgTable(
+  "knowledge_articles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    categoryId: uuid("category_id").notNull().references(() => knowledgeCategories.id, { onDelete: "restrict" }),
+    status: knowledgeArticleStatusEnum("status").notNull().default("draft"),
+    createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    currentDraftRevisionId: uuid("current_draft_revision_id"),
+    publishedRevisionId: uuid("published_revision_id"),
+    requiresAcknowledgement: boolean("requires_acknowledgement").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (table) => [index("knowledge_articles_status_updated_idx").on(table.status, table.updatedAt), index("knowledge_articles_category_idx").on(table.categoryId, table.status)],
+);
+
+export const knowledgeArticleRevisions = pgTable(
+  "knowledge_article_revisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    articleId: uuid("article_id").notNull().references(() => knowledgeArticles.id, { onDelete: "cascade" }),
+    revisionNumber: integer("revision_number").notNull(),
+    status: knowledgeRevisionStatusEnum("status").notNull().default("draft"),
+    title: text("title").notNull(),
+    summary: text("summary"),
+    body: text("body").notNull(),
+    contentFormat: knowledgeContentFormatEnum("content_format").notNull().default("markdown"),
+    contentVersion: integer("content_version").notNull().default(1),
+    createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    publishedBy: uuid("published_by").references(() => users.id, { onDelete: "restrict" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+  },
+  (table) => [uniqueIndex("knowledge_revisions_article_number_unique").on(table.articleId, table.revisionNumber), index("knowledge_revisions_article_status_idx").on(table.articleId, table.status)],
+);
+
+export const knowledgeVisibilityTargets = pgTable(
+  "knowledge_visibility_targets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    articleId: uuid("article_id").notNull().references(() => knowledgeArticles.id, { onDelete: "cascade" }),
+    kind: knowledgeVisibilityKindEnum("kind").notNull(),
+    storeId: uuid("store_id").references(() => stores.id, { onDelete: "restrict" }),
+    role: userRoleEnum("role"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("knowledge_visibility_target_unique").on(table.articleId, table.kind, table.storeId, table.role), index("knowledge_visibility_target_store_idx").on(table.storeId, table.kind), check("knowledge_visibility_target_shape_check", sql`(${table.kind} = 'all' and ${table.storeId} is null and ${table.role} is null) or (${table.kind} = 'store' and ${table.storeId} is not null and ${table.role} is null) or (${table.kind} = 'role' and ${table.role} in ('staff', 'manager'))`)],
+);
+
+export const knowledgeAttachments = pgTable(
+  "knowledge_attachments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    revisionId: uuid("revision_id").notNull().references(() => knowledgeArticleRevisions.id, { onDelete: "cascade" }),
+    storageKey: text("storage_key").notNull(),
+    originalFilename: text("original_filename").notNull(),
+    mimeType: text("mime_type").notNull(),
+    fileSize: integer("file_size").notNull(),
+    uploadedBy: uuid("uploaded_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("knowledge_attachments_storage_key_unique").on(table.storageKey), index("knowledge_attachments_revision_idx").on(table.revisionId, table.createdAt), check("knowledge_attachments_size_check", sql`${table.fileSize} > 0 and ${table.fileSize} <= 10485760`), check("knowledge_attachments_mime_check", sql`${table.mimeType} in ('application/pdf', 'image/jpeg', 'image/png', 'image/webp')`)],
+);
+
+export const knowledgeArticleQuizLinks = pgTable(
+  "knowledge_article_quiz_links",
+  {
+    articleId: uuid("article_id").notNull().references(() => knowledgeArticles.id, { onDelete: "cascade" }),
+    quizId: uuid("quiz_id").notNull().references(() => quizzes.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.articleId, table.quizId] }), index("knowledge_article_quiz_links_quiz_idx").on(table.quizId)],
+);
+
+export const knowledgeAcknowledgments = pgTable(
+  "knowledge_acknowledgments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    employeeId: uuid("employee_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    articleId: uuid("article_id").notNull().references(() => knowledgeArticles.id, { onDelete: "restrict" }),
+    revisionId: uuid("revision_id").notNull().references(() => knowledgeArticleRevisions.id, { onDelete: "restrict" }),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("knowledge_ack_employee_revision_unique").on(table.employeeId, table.revisionId), index("knowledge_ack_article_idx").on(table.articleId, table.acknowledgedAt), index("knowledge_ack_employee_idx").on(table.employeeId, table.acknowledgedAt)],
 );
