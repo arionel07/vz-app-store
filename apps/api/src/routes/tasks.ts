@@ -90,7 +90,7 @@ export function registerTaskRoutes(app: Hono, options: TaskRoutesOptions): void 
 
   app.get("/api/v1/management/tasks", async (context) => {
     const principal = await requirePrincipal(options.resolvePrincipal, context);
-    return context.json(await options.tasks.list(principal, parseInput(taskListQuerySchema, context.req.query())), 200);
+    return context.json(await options.tasks.listManagement(principal, parseInput(taskListQuerySchema, context.req.query())), 200);
   });
   app.post("/api/v1/management/tasks", async (context) => {
     const principal = await requirePrincipal(options.resolvePrincipal, context);
@@ -98,7 +98,7 @@ export function registerTaskRoutes(app: Hono, options: TaskRoutesOptions): void 
   });
   app.get("/api/v1/management/tasks/:id", async (context) => {
     const principal = await requirePrincipal(options.resolvePrincipal, context);
-    return context.json(await options.tasks.get(principal, idParam(context, "id")), 200);
+    return context.json(await options.tasks.getManagement(principal, idParam(context, "id")), 200);
   });
   app.patch("/api/v1/management/tasks/:id", async (context) => {
     const principal = await requirePrincipal(options.resolvePrincipal, context);
@@ -106,7 +106,7 @@ export function registerTaskRoutes(app: Hono, options: TaskRoutesOptions): void 
   });
   app.get("/api/v1/management/tasks/:id/history", async (context) => {
     const principal = await requirePrincipal(options.resolvePrincipal, context);
-    return context.json(await options.tasks.listHistory(principal, idParam(context, "id")), 200);
+    return context.json(await options.tasks.listHistoryManagement(principal, idParam(context, "id")), 200);
   });
 
   app.get("/api/v1/management/task-templates", async (context) => {
