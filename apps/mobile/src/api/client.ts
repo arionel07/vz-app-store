@@ -34,6 +34,12 @@ import {
 	type EmployeeProfileSafeResponse,
 	type StaffScheduleResponse,
 	staffScheduleResponseSchema,
+	taskListResponseSchema,
+	taskResponseSchema,
+	type TaskListQuery,
+	type TaskResponse,
+	type TaskChecklistUpdate,
+	type TaskSubmit,
 } from '@vizaje/contracts'
 
 const REQUEST_TIMEOUT_MS = 10_000
@@ -93,9 +99,10 @@ type ResponseSchema<T> = {
 }
 
 type RequestOptions = {
-	method?: 'GET' | 'POST'
+	method?: 'GET' | 'POST' | 'PATCH'
 	token?: string
 	body?: unknown
+	idempotencyKey?: string
 	allowRetry?: boolean
 }
 
@@ -118,6 +125,7 @@ async function requestJson<T>(path: string, schema: ResponseSchema<T>, options: 
 	const headers: Record<string, string> = { Accept: 'application/json' }
 	if (options.body !== undefined) headers['Content-Type'] = 'application/json'
 	if (options.token) headers.Authorization = `Bearer ${options.token}`
+	if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey
 
 	let attempt = 0
 	while (true) {
@@ -176,6 +184,31 @@ export function getMyProfile(token: string): Promise<EmployeeProfileSafeResponse
 export function getMySchedule(token: string, from: string, to: string): Promise<StaffScheduleResponse> {
 	const params = new URLSearchParams({ from, to })
 	return requestJson(`/api/v1/me/schedule?${params.toString()}`, staffScheduleResponseSchema, { token, allowRetry: true })
+}
+
+export function listMyTasks(token: string, query: TaskListQuery = { page: 1, pageSize: 100 }): Promise<{ data: TaskResponse[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
+	const params = new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize) })
+	if (query.status) params.set('status', query.status)
+	if (query.priority) params.set('priority', query.priority)
+	if (query.overdue !== undefined) params.set('overdue', String(query.overdue))
+	return requestJson(`/api/v1/me/tasks?${params.toString()}`, taskListResponseSchema, { token, allowRetry: true })
+}
+
+export function getMyTask(token: string, taskId: string): Promise<TaskResponse> {
+	return requestJson(`/api/v1/me/tasks/${encodeURIComponent(taskId)}`, taskResponseSchema, { token, allowRetry: true })
+}
+
+export function startMyTask(token: string, taskId: string): Promise<TaskResponse> {
+	return requestJson(`/api/v1/me/tasks/${encodeURIComponent(taskId)}/start`, taskResponseSchema, { method: 'POST', token })
+}
+
+export function updateMyTaskChecklist(token: string, taskId: string, itemId: string, input: TaskChecklistUpdate): Promise<TaskResponse> {
+	return requestJson(`/api/v1/me/tasks/${encodeURIComponent(taskId)}/checklist/${encodeURIComponent(itemId)}`, taskResponseSchema, { method: 'PATCH', token, body: input })
+}
+
+export function submitMyTask(token: string, taskId: string, input: TaskSubmit, idempotencyKey: string): Promise<TaskResponse> {
+	const body = { ...input }
+	return requestJson(`/api/v1/me/tasks/${encodeURIComponent(taskId)}/submit`, taskResponseSchema, { method: 'POST', token, body, idempotencyKey })
 }
 
 export function listStores(token: string, query: StoreListQuery = { page: 1, pageSize: 100, sortBy: 'name', sortDirection: 'asc' }): Promise<StoreListResponse> {
@@ -350,6 +383,43 @@ export async function downloadPhotoImage(token: string, photo: Pick<PhotoRespons
 		if (result.status < 200 || result.status >= 300) {
 			await FileSystem.deleteAsync(result.uri, { idempotent: true }).catch(() => undefined)
 			throw new ApiError(result.status, result.status === 401 ? 'UNAUTHENTICATED' : result.status === 404 ? 'PHOTO_NOT_FOUND' : 'PHOTO_DOWNLOAD_FAILED', 'Не удалось загрузить фотографию')
+		}
+		return result.uri
+	} catch (error) {
+		if (error instanceof ApiError) throw error
+		throw new ApiError(0, 'NETWORK_UNAVAILABLE', 'Сервис временно недоступен')
+	}
+}
+
+export async function uploadTaskEvidence(token: string, taskId: string, file: PhotoUploadFile, idempotencyKey: string): Promise<TaskResponse['evidence'][number]> {
+	const form = new FormData()
+	form.append('file', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob)
+	try {
+		const response = await fetch(`${apiOrigin()}/api/v1/me/tasks/${encodeURIComponent(taskId)}/evidence`, {
+			method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Idempotency-Key': idempotencyKey }, body: form, credentials: 'omit',
+		})
+		let body: unknown = null
+		try { body = await response.json() } catch { body = null }
+		if (!response.ok) throw requestError(response.status, body)
+		const parsed = taskResponseSchema.shape.evidence.element.safeParse(body)
+		if (!parsed.success) throw new ApiError(502, 'INVALID_API_RESPONSE', 'Сервер вернул некорректные данные')
+		return parsed.data
+	} catch (error) {
+		if (error instanceof ApiError) throw error
+		throw new ApiError(0, 'NETWORK_UNAVAILABLE', 'Сервис временно недоступен')
+	}
+}
+
+export async function downloadTaskEvidence(token: string, evidence: Pick<TaskResponse['evidence'][number], 'id' | 'mimeType'>): Promise<string> {
+	const FileSystem = await import('expo-file-system/legacy')
+	if (!FileSystem.cacheDirectory) throw new ApiError(0, 'CACHE_UNAVAILABLE', 'Временное хранилище недоступно')
+	const extension = evidence.mimeType === 'image/png' ? 'png' : evidence.mimeType === 'image/webp' ? 'webp' : 'jpg'
+	const target = `${FileSystem.cacheDirectory}vizaje-task-evidence-${encodeURIComponent(evidence.id)}.${extension}`
+	try {
+		const result = await FileSystem.downloadAsync(`${apiOrigin()}/api/v1/task-evidence/${encodeURIComponent(evidence.id)}`, target, { headers: { Authorization: `Bearer ${token}`, Accept: evidence.mimeType } })
+		if (result.status < 200 || result.status >= 300) {
+			await FileSystem.deleteAsync(result.uri, { idempotent: true }).catch(() => undefined)
+			throw new ApiError(result.status, result.status === 401 ? 'UNAUTHENTICATED' : result.status === 404 ? 'EVIDENCE_NOT_FOUND' : 'EVIDENCE_DOWNLOAD_FAILED', 'Не удалось загрузить фото задания')
 		}
 		return result.uri
 	} catch (error) {

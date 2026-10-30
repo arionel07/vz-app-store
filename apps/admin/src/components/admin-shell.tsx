@@ -11,6 +11,7 @@ import {
 	ChevronRight,
 	ClipboardList,
 	Image,
+	ListChecks,
 	CalendarDays,
 	Leaf,
 	LayoutGrid,
@@ -37,6 +38,7 @@ const navItems = [
 	{ label: 'Результаты', icon: BarChart3, value: 'results' },
 	{ label: 'Фотографии', icon: Image, value: 'photos' },
 	{ label: 'Расписание', icon: CalendarDays, value: 'schedules' },
+	{ label: 'Задания', icon: ListChecks, value: 'tasks' },
 ]
 
 export function ThemeSwitcher() {
@@ -122,7 +124,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 					{navItems.map(({ label, icon: Icon, value }) => {
 						const path = value === 'overview' ? '/' : `/${value}`
 						const active = value === 'overview' ? isOverview : pathname.startsWith(path)
-						const implemented = value === 'overview' || value === 'employees' || value === 'stores' || value === 'quizzes' || value === 'results' || value === 'photos' || value === 'schedules'
+						const implemented = value === 'overview' || value === 'employees' || value === 'stores' || value === 'quizzes' || value === 'results' || value === 'photos' || value === 'schedules' || value === 'tasks'
 						return <button key={value} type="button" className={cn('nav-item', active && 'nav-item-active')} onClick={() => {
 							if (implemented) router.push(path)
 							else toast.info(`${label}: раздел будет доступен позже`)

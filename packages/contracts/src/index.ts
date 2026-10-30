@@ -8,3 +8,4 @@ export * from "./users";
 export * from "./dashboard";
 export * from "./employee-profiles";
 export * from "./schedules";
+export * from "./tasks";

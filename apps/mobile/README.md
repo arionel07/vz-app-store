@@ -42,3 +42,5 @@ authenticated staff member's published schedule with a bounded local date
 range; drafts, other employees, and unauthorized stores are never shown by
 the API. Local shift times and overnight business dates come from the
 server's timezone-aware schedule contract.
+
+The Home screen also opens **Задания** without adding another bottom tab. The task flow loads only assigned occurrences, preserves server-side checklist versions, supports start/complete/submit transitions, and uploads optional or required evidence through authenticated foreground requests. Private evidence previews are downloaded to the device cache only; task tokens and storage keys are never persisted or logged.

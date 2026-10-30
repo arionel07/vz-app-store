@@ -92,6 +92,13 @@
       "when": 1793321000000,
       "tag": "0012_work_schedules",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793322000000,
+      "tag": "0013_tasks_checklists",
+      "breakpoints": true
     }
   ]
 }

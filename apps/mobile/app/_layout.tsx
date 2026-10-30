@@ -40,6 +40,8 @@ export default function RootLayout() {
 			<Stack.Screen name="(tabs)" />
 			<Stack.Screen name="profile" />
 			<Stack.Screen name="schedule" />
+			<Stack.Screen name="tasks" />
+			<Stack.Screen name="task/[id]" />
 			<Stack.Screen name="activation" />
 			<Stack.Screen name="activate" />
 			<Stack.Screen name="quiz/[id]" />

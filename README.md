@@ -88,6 +88,10 @@ Milestone 15 adds timezone-aware employee schedules for active stores. Managemen
 
 Schedule times are entered as local wall-clock values and stored with UTC instants plus the IANA timezone snapshot (default `Europe/Chisinau`). Overnight shifts keep the starting business date. Nonexistent and ambiguous DST times are rejected. Publication and superseding revisions, mutations, and history are written transactionally with `schedule.updated` or `schedule.published` domain events. Payroll, attendance, swaps, and vacation workflows are intentionally out of scope.
 
+## Tasks and checklists
+
+Milestone 16 adds explicit retail tasks. Admins and managers create versioned templates or assign one-time tasks to eligible employees, stores, or roles within their scope. Employees see only their assigned occurrences in Mobile, complete independent checklist snapshots, attach private evidence when required, and submit for review. The API enforces `assigned → in_progress → submitted → checked/rejected`, requires a rejection comment, prevents self-approval, keeps immutable history, and supports explicit idempotent daily/weekly/monthly recurrence generation. Task evidence is stored separately from photo reports and is never returned as an object key or public URL. No notification worker is included.
+
 ## Authentication
 
 - `POST /api/v1/auth/login` authenticates active admin/manager accounts with email and password.

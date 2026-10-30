@@ -29,6 +29,10 @@ export const quizAnswerReviewStatusEnum = pgEnum("quiz_answer_review_status", ["
 export const quizAssignmentTargetTypeEnum = pgEnum("quiz_assignment_target_type", ["store", "role", "user"]);
 export const photoReviewStatusEnum = pgEnum("photo_review_status", ["pending", "checked", "rejected"]);
 export const scheduleStatusEnum = pgEnum("schedule_status", ["draft", "published"]);
+export const taskPriorityEnum = pgEnum("task_priority", ["low", "normal", "high", "urgent"]);
+export const taskStatusEnum = pgEnum("task_status", ["assigned", "in_progress", "submitted", "checked", "rejected"]);
+export const taskSubmissionStatusEnum = pgEnum("task_submission_status", ["submitted", "checked", "rejected"]);
+export const taskRecurrenceFrequencyEnum = pgEnum("task_recurrence_frequency", ["daily", "weekly", "monthly"]);
 
 export const users = pgTable(
   "users",
@@ -623,4 +627,181 @@ export const scheduleHistory = pgTable(
   (table) => [
     index("schedule_history_schedule_created_idx").on(table.scheduleId, table.createdAt),
   ],
+);
+
+export const taskTemplates = pgTable(
+  "task_templates",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: text("title").notNull(),
+    description: text("description"),
+    category: text("category").notNull(),
+    defaultPriority: taskPriorityEnum("default_priority").notNull().default("normal"),
+    requiresReview: boolean("requires_review").notNull().default(true),
+    requiresPhoto: boolean("requires_photo").notNull().default(false),
+    active: boolean("active").notNull().default(true),
+    createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("task_templates_active_idx").on(table.active, table.updatedAt)],
+);
+
+export const taskTemplateVersions = pgTable(
+  "task_template_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    templateId: uuid("template_id").notNull().references(() => taskTemplates.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    title: text("title").notNull(),
+    description: text("description"),
+    category: text("category").notNull(),
+    priority: taskPriorityEnum("priority").notNull(),
+    requiresReview: boolean("requires_review").notNull(),
+    requiresPhoto: boolean("requires_photo").notNull(),
+    createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("task_template_versions_template_number_unique").on(table.templateId, table.version), index("task_template_versions_template_idx").on(table.templateId, table.version)],
+);
+
+export const taskTemplateChecklistItems = pgTable(
+  "task_template_checklist_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    versionId: uuid("version_id").notNull().references(() => taskTemplateVersions.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    label: text("label").notNull(),
+    isRequired: boolean("is_required").notNull().default(true),
+    requiresEvidence: boolean("requires_evidence").notNull().default(false),
+  },
+  (table) => [uniqueIndex("task_template_checklist_position_unique").on(table.versionId, table.position)],
+);
+
+export const taskRecurrences = pgTable(
+  "task_recurrences",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    templateVersionId: uuid("template_version_id").notNull().references(() => taskTemplateVersions.id, { onDelete: "restrict" }),
+    storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "restrict" }),
+    employeeIds: jsonb("employee_ids").$type<string[]>().notNull().default([]),
+    roles: jsonb("roles").$type<string[]>().notNull().default([]),
+    frequency: taskRecurrenceFrequencyEnum("frequency").notNull(),
+    interval: integer("interval").notNull().default(1),
+    weekday: integer("weekday"),
+    monthDay: integer("month_day"),
+    startsOn: date("starts_on", { mode: "string" }).notNull(),
+    endsOn: date("ends_on", { mode: "string" }),
+    timezone: text("timezone").notNull().default("Europe/Chisinau"),
+    active: boolean("active").notNull().default(true),
+    createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("task_recurrences_active_idx").on(table.active, table.startsOn, table.endsOn), index("task_recurrences_store_idx").on(table.storeId)],
+);
+
+export const taskOccurrences = pgTable(
+  "task_occurrences",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    assignmentGroupId: uuid("assignment_group_id").notNull(),
+    recurrenceId: uuid("recurrence_id").references(() => taskRecurrences.id, { onDelete: "set null" }),
+    recurrenceLocalDate: date("recurrence_local_date", { mode: "string" }),
+    templateId: uuid("template_id").references(() => taskTemplates.id, { onDelete: "set null" }),
+    templateVersionId: uuid("template_version_id").references(() => taskTemplateVersions.id, { onDelete: "set null" }),
+    storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "restrict" }),
+    assignedEmployeeId: uuid("assigned_employee_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    category: text("category").notNull(),
+    priority: taskPriorityEnum("priority").notNull().default("normal"),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    timezone: text("timezone").notNull().default("Europe/Chisinau"),
+    status: taskStatusEnum("status").notNull().default("assigned"),
+    requiresReview: boolean("requires_review").notNull().default(true),
+    requiresPhoto: boolean("requires_photo").notNull().default(false),
+    version: integer("version").notNull().default(1),
+    createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("task_occurrences_recurrence_employee_date_unique").on(table.recurrenceId, table.storeId, table.assignedEmployeeId, table.recurrenceLocalDate),
+    index("task_occurrences_store_status_idx").on(table.storeId, table.status, table.dueAt),
+    index("task_occurrences_employee_status_idx").on(table.assignedEmployeeId, table.status, table.dueAt),
+  ],
+);
+
+export const taskChecklistItems = pgTable(
+  "task_checklist_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    taskId: uuid("task_id").notNull().references(() => taskOccurrences.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    label: text("label").notNull(),
+    isRequired: boolean("is_required").notNull().default(true),
+    requiresEvidence: boolean("requires_evidence").notNull().default(false),
+    completed: boolean("completed").notNull().default(false),
+    note: text("note"),
+    completedBy: uuid("completed_by").references(() => users.id, { onDelete: "set null" }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [uniqueIndex("task_checklist_items_task_position_unique").on(table.taskId, table.position), index("task_checklist_items_task_idx").on(table.taskId)],
+);
+
+export const taskSubmissions = pgTable(
+  "task_submissions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    taskId: uuid("task_id").notNull().references(() => taskOccurrences.id, { onDelete: "cascade" }),
+    submittedBy: uuid("submitted_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    submissionVersion: integer("submission_version").notNull(),
+    status: taskSubmissionStatusEnum("status").notNull().default("submitted"),
+    answers: jsonb("answers").$type<Array<{ itemId: string; completed: boolean; note: string | null }>>().notNull().default([]),
+    completionNote: text("completion_note"),
+    reviewerComment: text("reviewer_comment"),
+    idempotencyKey: text("idempotency_key"),
+    idempotencyPayloadHash: text("idempotency_payload_hash"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "restrict" }),
+  },
+  (table) => [uniqueIndex("task_submissions_task_version_unique").on(table.taskId, table.submissionVersion), uniqueIndex("task_submissions_idempotency_unique").on(table.taskId, table.submittedBy, table.idempotencyKey), index("task_submissions_review_idx").on(table.status, table.submittedAt)],
+);
+
+export const taskEvidence = pgTable(
+  "task_evidence",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    taskId: uuid("task_id").notNull().references(() => taskOccurrences.id, { onDelete: "cascade" }),
+    submissionId: uuid("submission_id").references(() => taskSubmissions.id, { onDelete: "set null" }),
+    uploadedBy: uuid("uploaded_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    storageKey: text("storage_key").notNull(),
+    idempotencyKey: text("idempotency_key"),
+    idempotencyPayloadHash: text("idempotency_payload_hash"),
+    originalFilename: text("original_filename").notNull(),
+    mimeType: text("mime_type").notNull(),
+    fileSize: integer("file_size").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("task_evidence_storage_key_unique").on(table.storageKey), uniqueIndex("task_evidence_uploader_idempotency_unique").on(table.taskId, table.uploadedBy, table.idempotencyKey), index("task_evidence_task_idx").on(table.taskId, table.createdAt), index("task_evidence_submission_idx").on(table.submissionId)],
+);
+
+export const taskReviewHistory = pgTable(
+  "task_review_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    taskId: uuid("task_id").notNull().references(() => taskOccurrences.id, { onDelete: "cascade" }),
+    submissionId: uuid("submission_id").references(() => taskSubmissions.id, { onDelete: "restrict" }),
+    actorId: uuid("actor_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    action: text("action").notNull(),
+    previousStatus: taskStatusEnum("previous_status"),
+    nextStatus: taskStatusEnum("next_status").notNull(),
+    comment: text("comment"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("task_review_history_task_idx").on(table.taskId, table.createdAt), index("task_review_history_submission_idx").on(table.submissionId, table.createdAt)],
 );

@@ -18,6 +18,7 @@ import {
   type ManagementServices,
   type PrincipalResolver,
 } from "./routes/management";
+import { registerTaskRoutes, type TaskRoutesOptions } from "./routes/tasks";
 
 export interface AppDependencies {
   db: {
@@ -30,6 +31,7 @@ export interface AppDependencies {
   quizRoutes?: QuizRoutesOptions;
   photoRoutes?: PhotoRoutesOptions;
   dashboardRoutes?: DashboardRoutesOptions;
+  taskRoutes?: TaskRoutesOptions;
   logger?: Logger;
 }
 
@@ -43,6 +45,7 @@ export function createApp({
   quizRoutes,
   photoRoutes,
   dashboardRoutes,
+  taskRoutes,
 }: AppDependencies) {
   const app = new Hono();
 
@@ -104,6 +107,7 @@ export function createApp({
   if (quizRoutes) registerQuizRoutes(app, quizRoutes);
   if (photoRoutes) registerPhotoRoutes(app, photoRoutes);
   if (dashboardRoutes) registerDashboardRoutes(app, dashboardRoutes);
+  if (taskRoutes) registerTaskRoutes(app, taskRoutes);
 
   app.notFound((context) => {
     const response = errorResponseSchema.parse({

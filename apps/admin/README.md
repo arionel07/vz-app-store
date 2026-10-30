@@ -1,6 +1,6 @@
 # Vizaje Staff Admin
 
-Desktop-first management interface for the internal Vizaje Staff application. The Admin uses the authenticated same-origin BFF and typed shared contracts for employee/store management, quizzes, photo review, dashboard data, and work schedules.
+Desktop-first management interface for the internal Vizaje Staff application. The Admin uses the authenticated same-origin BFF and typed shared contracts for employee/store management, quizzes, photo review, dashboard data, work schedules, and retail tasks.
 
 ## Run locally
 
@@ -36,3 +36,5 @@ bun run --cwd apps/admin build
 The UI supports light, dark, and system themes. Theme preference is local to the browser; no server-side user preference is persisted yet.
 
 The **Расписание** section is scoped by the API to the administrator or manager's active stores. Draft periods support shift/day-off CRUD, publication, explicit revisions of published periods, and actor history. All schedule dates are interpreted in the period's IANA timezone; the current default is `Europe/Chisinau`.
+
+The **Задания** section uses the same management scope. It creates versioned task templates and one-time assignments, lists deadlines and statuses, opens private evidence through the authenticated BFF, and checks or rejects submissions with immutable history. Recurring assignments are generated explicitly through the API; there is no hidden scheduler or notification delivery.
