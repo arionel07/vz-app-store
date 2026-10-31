@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { buildActivationLink, parseActivationPayload } from '@vizaje/contracts'
-import { createActivationLinkGate, parseActivationPayload as parseMobileActivationPayload } from '../src/auth/activation-payload'
+import { createActivationLinkGate, isActivationUrlCandidate, parseActivationPayload as parseMobileActivationPayload } from '../src/auth/activation-payload'
 
 const activationId = '11111111-1111-4111-8111-111111111111'
 
@@ -36,6 +36,13 @@ describe('activation QR payload', () => {
 		expect(parseActivationPayload('http://localhost:3001/activate?token=local-secret', 'http://localhost:3001/activate')).toEqual({ source: 'link', secret: 'local-secret' })
 		expect(parseActivationPayload('http://attacker.example/activate?token=local-secret', 'http://localhost:3001/activate')).toBeNull()
 		expect(parseActivationPayload('https://staff.example.com/activate?token=secret&extra=value', 'https://staff.example.com/activate')).toBeNull()
+	})
+
+	test('ignores ordinary app URLs but recognizes malformed activation links for safe feedback', () => {
+		expect(isActivationUrlCandidate('https://app.example.com/')).toBe(false)
+		expect(isActivationUrlCandidate('vizaje://activate?token=missing')).toBe(true)
+		expect(isActivationUrlCandidate('https://staff.example.com/activate?token=', 'https://staff.example.com/activate')).toBe(true)
+		expect(isActivationUrlCandidate('https://attacker.example/activate?token=secret', 'https://staff.example.com/activate')).toBe(false)
 	})
 
 	test('suppresses duplicate link events without persisting the secret', () => {

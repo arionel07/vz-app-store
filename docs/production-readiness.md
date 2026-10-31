@@ -1,5 +1,7 @@
 # Production readiness runbook
 
+For the full application security audit, staging proposal, release blockers, and device checklist, see [`PRODUCTION_READINESS.md`](PRODUCTION_READINESS.md). This file retains the earlier API-specific operational notes.
+
 This document describes the operational assumptions for the Vizaje Staff API. It does not create production credentials, infrastructure, or a production domain.
 
 ## Required configuration

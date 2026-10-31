@@ -1,11 +1,11 @@
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera'
 import { useURL } from 'expo-linking'
-import { Camera, ChevronLeft, Eye, EyeOff, LogIn, Mail, QrCode } from 'lucide-react-native'
+import { Camera, ChevronLeft, Eye, EyeOff, Leaf, LockKeyhole, Mail, ScanQrCode } from 'lucide-react-native'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Alert, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View, type TextInputInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ApiError, isNetworkError } from '../src/api/client'
-import { createActivationLinkGate, parseActivationPayload, type ActivationPayload } from '../src/auth/activation-payload'
+import { createActivationLinkGate, isActivationUrlCandidate, parseActivationPayload, type ActivationPayload } from '../src/auth/activation-payload'
 import { useAuth } from '../src/auth/auth-context'
 import { mobileLoginErrorMessage } from '../src/auth/login-errors'
 import { ActionButton, Card, Screen } from '../src/components/ui'
@@ -27,12 +27,13 @@ export default function ActivationScreen() {
 	const [scanning, setScanning] = useState(false)
 	const [busy, setBusy] = useState(false)
 	const [message, setMessage] = useState<string | null>(null)
-	const [showLogin, setShowLogin] = useState(false)
+	const [showLogin, setShowLogin] = useState(true)
 	const [loginEmail, setLoginEmail] = useState('')
 	const [loginPassword, setLoginPassword] = useState('')
 	const [showPassword, setShowPassword] = useState(false)
 	const [loginMessage, setLoginMessage] = useState<string | null>(null)
 	const [pendingLink, setPendingLink] = useState<ActivationPayload | null>(null)
+	const passwordInputRef = useRef<TextInputInstance>(null)
 	const scanLocked = useRef(false)
 	const busyRef = useRef(false)
 	const lastUrl = useRef<string | null>(null)
@@ -62,6 +63,7 @@ export default function ActivationScreen() {
 	useEffect(() => {
 		if (!url || url === lastUrl.current) return
 		lastUrl.current = url
+		if (!isActivationUrlCandidate(url, activationLinkBaseUrl)) return
 		const payload = parseActivationPayload(url, activationLinkBaseUrl)
 		if (!payload) {
 			setMessage('Ссылка активации недействительна или больше не поддерживается.')
@@ -121,6 +123,23 @@ export default function ActivationScreen() {
 		setScanning(true)
 	}
 
+	const showPasswordResetHelp = () => Alert.alert(
+		'Сброс пароля',
+		'Попросите менеджера или администратора назначить новый пароль.',
+	)
+
+	const openQrLogin = () => {
+		setMessage(null)
+		setLoginMessage(null)
+		setShowLogin(false)
+	}
+
+	const openEmailLogin = () => {
+		setMessage(null)
+		setLoginMessage(null)
+		setShowLogin(true)
+	}
+
 	const onBarcodeScanned = (result: BarcodeScanningResult) => {
 		const payload = parseActivationPayload(result.data)
 		if (!payload || payload.source !== 'custom') {
@@ -133,17 +152,128 @@ export default function ActivationScreen() {
 
 	if (scanning) return <ScannerView colors={colors} onClose={() => setScanning(false)} onBarcodeScanned={scanLocked.current ? undefined : onBarcodeScanned} />
 
-	return <Screen keyboardAware={showLogin} contentStyle={styles.content}>
-		<View style={styles.brandBlock}><Text style={[styles.title, { color: colors.text }]}>{showLogin ? 'Вход' : 'Добро пожаловать'}</Text></View>
+	return <Screen keyboardAware={showLogin && !pendingLink} contentStyle={styles.content}>
+		{!pendingLink && <View style={styles.topBar}>
+			{showLogin ? <Pressable
+				accessibilityRole="button"
+				accessibilityLabel="Назад к входу по QR-коду"
+				disabled={busy || loginSubmitting}
+				onPress={openQrLogin}
+				style={({ pressed }) => [styles.backButton, { backgroundColor: colors.surfaceRaised, opacity: pressed ? 0.72 : 1 }]}
+			><ChevronLeft color={colors.text} size={25} strokeWidth={2} /></Pressable> : <View style={styles.backPlaceholder} />}
+		</View>}
 
-		{pendingLink && <Card style={styles.linkConfirmation}><Text style={[styles.confirmationTitle, { color: colors.text }]}>Подтвердите активацию</Text><ActionButton label="Активировать приложение" onPress={confirmLinkActivation} disabled={busy} /><ActionButton label="Отмена" variant="quiet" onPress={cancelLinkActivation} disabled={busy} /></Card>}
+		<View style={styles.brandBlock}>
+			<Leaf accessibilityLabel="Vizaje" color={colors.text} size={48} strokeWidth={2.2} />
+			<Text style={[styles.title, { color: colors.text }]}>{pendingLink ? 'Подтвердите вход' : showLogin ? 'Войти' : 'Войти по QR'}</Text>
+		</View>
 
-		{!pendingLink && !showLogin && <View style={styles.activationPanel}><View style={[styles.qrMark, { backgroundColor: colors.accentSoft }]}><QrCode color={colors.accent} size={42} strokeWidth={1.7} /></View><Text style={[styles.panelTitle, { color: colors.text }]}>Подключение по QR</Text><ActionButton label="Сканировать QR" icon={Camera} onPress={() => void startScanning()} disabled={busy} /><ActionButton label="Войти по email" icon={Mail} variant="secondary" onPress={() => { setShowLogin(true); setLoginMessage(null) }} disabled={busy} /></View>}
+		{pendingLink && <Card style={styles.linkConfirmation}>
+			<Text style={[styles.confirmationTitle, { color: colors.text }]}>Подтвердите активацию</Text>
+			<ActionButton label="Активировать приложение" onPress={confirmLinkActivation} disabled={busy} />
+			<ActionButton label="Отмена" variant="quiet" onPress={cancelLinkActivation} disabled={busy} />
+		</Card>}
 
-		{!pendingLink && showLogin && <View style={styles.loginPanel}><Text style={[styles.panelTitle, { color: colors.text }]}>Вход по email</Text><View style={styles.fieldGroup}><Text style={[styles.fieldLabel, { color: colors.text }]}>Электронная почта</Text><TextInput accessibilityLabel="Электронная почта" style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceRaised }]} value={loginEmail} onChangeText={setLoginEmail} placeholder="name@example.com" placeholderTextColor={colors.muted} autoCapitalize="none" autoCorrect={false} autoComplete="email" keyboardType="email-address" textContentType="emailAddress" editable={!busy && !loginSubmitting} returnKeyType="next" /></View><View style={styles.fieldGroup}><Text style={[styles.fieldLabel, { color: colors.text }]}>Пароль</Text><View style={[styles.passwordField, { borderColor: colors.border, backgroundColor: colors.surfaceRaised }]}><TextInput accessibilityLabel="Пароль" style={[styles.passwordInput, { color: colors.text }]} value={loginPassword} onChangeText={setLoginPassword} placeholder="Введите пароль" placeholderTextColor={colors.muted} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="current-password" textContentType="password" editable={!busy && !loginSubmitting} returnKeyType="done" onSubmitEditing={() => void submitLogin()} /><Pressable accessibilityRole="button" accessibilityLabel={showPassword ? 'Скрыть пароль' : 'Показать пароль'} onPress={() => setShowPassword((value) => !value)} hitSlop={8} disabled={busy || loginSubmitting}>{showPassword ? <EyeOff color={colors.muted} size={20} /> : <Eye color={colors.muted} size={20} />}</Pressable></View></View>{loginMessage && <Text accessibilityRole="alert" style={[styles.loginError, { color: colors.danger }]}>{loginMessage}</Text>}<ActionButton label={busy || loginSubmitting ? 'Выполняем вход…' : 'Войти'} icon={LogIn} disabled={busy || loginSubmitting} onPress={() => void submitLogin()} /><ActionButton label="Вернуться к QR-активации" variant="quiet" onPress={() => { setShowLogin(false); setLoginMessage(null) }} disabled={busy || loginSubmitting} /></View>}
+		{!pendingLink && showLogin && <View style={styles.loginPanel}>
+			<View style={styles.fields}>
+				<View style={[styles.inputField, { backgroundColor: colors.surfaceRaised }]}>
+					<Mail color={colors.muted} size={23} strokeWidth={1.9} />
+					<TextInput
+						accessibilityLabel="Электронная почта"
+						style={[styles.input, { color: colors.text }]}
+						value={loginEmail}
+						onChangeText={setLoginEmail}
+						placeholder="Email"
+						placeholderTextColor={colors.muted}
+						autoCapitalize="none"
+						autoCorrect={false}
+						autoComplete="email"
+						keyboardType="email-address"
+						textContentType="emailAddress"
+						editable={!busy && !loginSubmitting}
+						returnKeyType="next"
+						onSubmitEditing={() => passwordInputRef.current?.focus()}
+					/>
+				</View>
+				<View style={[styles.inputField, { backgroundColor: colors.surfaceRaised }]}>
+					<LockKeyhole color={colors.muted} size={23} strokeWidth={1.9} />
+					<TextInput
+						ref={passwordInputRef}
+						accessibilityLabel="Пароль"
+						style={[styles.input, styles.passwordInput, { color: colors.text }]}
+						value={loginPassword}
+						onChangeText={setLoginPassword}
+						placeholder="Пароль"
+						placeholderTextColor={colors.muted}
+						secureTextEntry={!showPassword}
+						autoCapitalize="none"
+						autoCorrect={false}
+						autoComplete="current-password"
+						textContentType="password"
+						editable={!busy && !loginSubmitting}
+						returnKeyType="done"
+						onSubmitEditing={() => void submitLogin()}
+					/>
+					<Pressable
+						accessibilityRole="button"
+						accessibilityLabel={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+						accessibilityState={{ selected: showPassword }}
+						onPress={() => setShowPassword((value) => !value)}
+						disabled={busy || loginSubmitting}
+						style={styles.visibilityButton}
+					>
+						{showPassword ? <EyeOff color={colors.muted} size={23} /> : <Eye color={colors.muted} size={23} />}
+					</Pressable>
+				</View>
+			</View>
+
+			{loginMessage && <Text accessibilityRole="alert" style={[styles.loginError, { color: colors.danger }]}>{loginMessage}</Text>}
+			<ActionButton
+				label={busy || loginSubmitting ? 'Выполняем вход…' : 'Войти'}
+				disabled={busy || loginSubmitting}
+				onPress={() => void submitLogin()}
+				style={styles.primaryButton}
+			/>
+			<Pressable
+				accessibilityRole="button"
+				onPress={showPasswordResetHelp}
+				style={styles.forgotButton}
+			>
+				<Text style={[styles.forgotText, { color: colors.accent }]}>Забыли пароль?</Text>
+			</Pressable>
+		</View>}
+
+		{!pendingLink && !showLogin && <View style={styles.qrStage}>
+			<View style={[styles.qrTarget, { backgroundColor: colors.surfaceRaised }]}>
+				<ScanQrCode color={colors.text} size={132} strokeWidth={1.65} />
+			</View>
+			<ActionButton
+				label={busy ? 'Подготавливаем камеру…' : 'Сканировать QR'}
+				icon={Camera}
+				disabled={busy}
+				onPress={() => void startScanning()}
+				style={[styles.primaryButton, styles.qrPrimaryButton]}
+			/>
+		</View>}
 
 		{message && <View accessibilityRole="alert" style={[styles.message, { backgroundColor: colors.surfaceRaised }]}><Text style={[styles.messageText, { color: colors.text }]}>{message}</Text>{message.includes('настройках') && <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()}><Text style={[styles.settingsLink, { color: colors.accent }]}>Открыть настройки</Text></Pressable>}</View>}
 		{busy && !loginSubmitting && <View style={styles.busy}><ActivityIndicator color={colors.accent} /><Text style={[styles.busyText, { color: colors.muted }]}>Проверяем код активации…</Text></View>}
+
+		{!pendingLink && <View style={styles.footer}>
+			<View style={styles.divider}>
+				<View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+				<Text style={[styles.dividerText, { color: colors.muted }]}>ИЛИ</Text>
+				<View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+			</View>
+			<ActionButton
+				label={showLogin ? 'Войти по QR-коду' : 'Войти через email'}
+				icon={showLogin ? ScanQrCode : Mail}
+				variant="secondary"
+				disabled={busy || loginSubmitting}
+				onPress={showLogin ? openQrLogin : openEmailLogin}
+				style={[styles.secondaryButton, { backgroundColor: colors.surfaceRaised, borderColor: colors.surfaceRaised }]}
+			/>
+		</View>}
 	</Screen>
 }
 
@@ -153,18 +283,29 @@ function ScannerView({ colors, onClose, onBarcodeScanned }: { colors: ThemeColor
 }
 
 const styles = StyleSheet.create({
-	content: { gap: 28 },
-	brandBlock: { gap: 8, paddingTop: 8 },
-	title: { fontSize: 30, fontWeight: '600', letterSpacing: -0.9 },
-	activationPanel: { alignItems: 'center', gap: 14, paddingTop: 22 },
-	qrMark: { width: 96, height: 96, alignItems: 'center', justifyContent: 'center', borderRadius: 28, marginBottom: 4 },
-	panelTitle: { fontSize: 21, fontWeight: '600', textAlign: 'center' },
-	loginPanel: { gap: 16 },
-	fieldGroup: { gap: 8 },
-	fieldLabel: { fontSize: 14, fontWeight: '600' },
-	input: { minHeight: 52, borderWidth: 1, borderRadius: 16, paddingHorizontal: 15, fontSize: 16 },
-	passwordField: { minHeight: 52, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 16, paddingLeft: 15, paddingRight: 15 },
-	passwordInput: { flex: 1, minHeight: 50, paddingVertical: 0, paddingRight: 10, fontSize: 16 },
+	content: { flexGrow: 1, gap: 0, justifyContent: 'space-between' },
+	topBar: { height: 48, flexDirection: 'row', alignItems: 'center' },
+	backButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24 },
+	backPlaceholder: { width: 48, height: 48 },
+	brandBlock: { alignItems: 'center', gap: 34, paddingTop: 8, paddingBottom: 24 },
+	title: { fontSize: 36, lineHeight: 44, fontWeight: '700', letterSpacing: -1.2, textAlign: 'center' },
+	loginPanel: { gap: 0 },
+	fields: { gap: 14 },
+	inputField: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 20, borderRadius: 23, paddingLeft: 21, paddingRight: 13 },
+	input: { flex: 1, minWidth: 0, minHeight: 58, paddingVertical: 0, fontSize: 17 },
+	passwordInput: { paddingRight: 0 },
+	visibilityButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+	primaryButton: { minHeight: 56, marginTop: 30 },
+	forgotButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
+	forgotText: { fontSize: 16, fontWeight: '500' },
+	qrStage: { flex: 1, minHeight: 300, alignItems: 'center', justifyContent: 'space-evenly', paddingVertical: 8 },
+	qrTarget: { width: '66%', maxWidth: 270, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 999 },
+	qrPrimaryButton: { alignSelf: 'stretch' },
+	footer: { paddingTop: 20, gap: 20 },
+	divider: { minHeight: 20, flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 12 },
+	dividerLine: { height: StyleSheet.hairlineWidth, flex: 1 },
+	dividerText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
+	secondaryButton: { minHeight: 62 },
 	loginError: { fontSize: 14, lineHeight: 20 },
 	message: { gap: 8, borderRadius: 16, padding: 14 },
 	messageText: { fontSize: 14, lineHeight: 20 },

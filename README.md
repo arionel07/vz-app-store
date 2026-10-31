@@ -55,7 +55,7 @@ curl http://localhost:3000/api/v1/health
 
 `/health` is a liveness check. `/api/v1/health` is a readiness check and verifies PostgreSQL with `SELECT 1`.
 
-CORS origins are configured with `CORS_ALLOWED_ORIGINS` as a comma-separated list. Development defaults include the standard local Next.js origins; production requires explicit origins and rejects `*`.
+CORS origins are configured with `CORS_ALLOWED_ORIGINS` as a comma-separated list. Development defaults include local HTTP origins. Production rejects `*`, but the current API configuration does not itself require explicit HTTPS origins; production deployments must set and verify an exact HTTPS allowlist.
 
 The Compose PostgreSQL port is bound to `127.0.0.1` and uses development-only credentials. Never reuse those credentials in production.
 
@@ -78,7 +78,7 @@ bun run auth:bootstrap-admin  # interactively create the first administrator
 
 The project intentionally does not include Redis, a separate broker, microservices, or deployment configuration. Notifications use the PostgreSQL outbox worker described in [`docs/notifications.md`](docs/notifications.md).
 
-Production configuration, backup/restore, reverse-proxy, S3, and reconciliation procedures are documented in [`docs/production-readiness.md`](docs/production-readiness.md). No production credentials or external S3 verification are included in this repository.
+The production-readiness audit, environment separation, staging proposal, backup/restore, private-media, push, and release checklists are documented in [`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md). The earlier API-specific runbook remains at [`docs/production-readiness.md`](docs/production-readiness.md). No production credentials or external S3 verification are included in this repository.
 
 Users and Stores domain services and contracts are now available for trusted application callers. Management HTTP routes use the authenticated trusted principal resolver; client-supplied role or user ID headers are ignored.
 
