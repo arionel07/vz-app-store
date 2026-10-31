@@ -9,7 +9,7 @@ describe("schedule local time conversion", () => {
   });
 
   test("rejects a nonexistent daylight-saving local time", () => {
-    expect(() => localDateTimeToUtc("2026-03-29", "02:30", "Europe/Chisinau")).toThrow("не существует");
+    expect(() => localDateTimeToUtc("2026-03-29", "03:30", "Europe/Chisinau")).toThrow("не существует");
   });
 
   test("rejects invalid IANA zones", () => {

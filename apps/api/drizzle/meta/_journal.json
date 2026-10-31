@@ -120,6 +120,27 @@
       "when": 1793325000000,
       "tag": "0016_knowledge_base",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793326000000,
+      "tag": "0017_retail_operations",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793425188000,
+      "tag": "0018_mobile_operations_idempotency",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793425190000,
+      "tag": "0019_operation_employee_notes",
+      "breakpoints": true
     }
   ]
 }

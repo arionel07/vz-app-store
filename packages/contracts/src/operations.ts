@@ -1,0 +1,72 @@
+import { z } from "zod";
+
+const uuid = z.string().uuid();
+const pageQuery = z.object({ page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(20) });
+const paginated = <T extends z.ZodTypeAny>(row: T) => z.object({ data: z.array(row), pagination: z.object({ page: z.number().int().positive(), pageSize: z.number().int().positive(), total: z.number().int().nonnegative(), totalPages: z.number().int().nonnegative() }) });
+const queryBoolean = z.union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")]);
+
+export const campaignStatusSchema = z.enum(["draft", "scheduled", "active", "completed", "archived", "cancelled"]);
+export const campaignExecutionStatusSchema = z.enum(["not_started", "in_progress", "submitted", "checked", "rejected"]);
+export const campaignCreateSchema = z.object({ title: z.string().trim().min(1).max(200), description: z.string().trim().max(10000).default(""), startsAt: z.string().datetime(), endsAt: z.string().datetime(), timezone: z.string().min(1).max(100), storeIds: z.array(uuid).min(1).max(100), requiredActions: z.array(z.string().trim().min(1).max(500)).max(30).default([]), requiresPhoto: z.boolean().default(false), referencePhotoIds: z.array(uuid).max(20).default([]) }).refine((v) => new Date(v.startsAt) < new Date(v.endsAt), { message: "Дата окончания должна быть позже даты начала", path: ["endsAt"] });
+export const campaignUpdateSchema = campaignCreateSchema.innerType().partial().extend({ storeIds: z.array(uuid).min(1).max(100).optional() }).refine(v=>Object.keys(v).length>0,"Укажите поля кампании").refine(v=>!v.startsAt||!v.endsAt||new Date(v.startsAt)<new Date(v.endsAt),{message:"Дата окончания должна быть позже начала",path:["endsAt"]});
+export const campaignActionSchema = z.object({ action:z.enum(["complete","archive","cancel"]) });
+export const campaignReviewSchema = z.object({ decision: z.enum(["checked", "rejected"]), comment: z.string().trim().max(2000).default("") }).refine((v) => v.decision !== "rejected" || v.comment.length > 0, { message: "Для отклонения укажите причину", path: ["comment"] });
+export const campaignSubmissionSchema = z.object({ actionResults: z.array(z.boolean()).max(30), photoIds: z.array(uuid).max(10).default([]).refine(v=>new Set(v).size===v.length,"Фото не должны повторяться"), employeeNote: z.string().trim().max(2000).default(""), idempotencyKey: z.string().trim().min(8).max(128) });
+export const campaignSubmissionResultSchema = z.object({ id: uuid, status: campaignExecutionStatusSchema, submittedAt: z.string().datetime(), version: z.number().int().positive() });
+export const campaignQuerySchema = pageQuery.extend({ status: campaignStatusSchema.optional(), storeId: uuid.optional() });
+export const campaignExecutionResponseSchema = z.object({ id: uuid, storeId: uuid, status: campaignExecutionStatusSchema, submittedAt: z.string().datetime().nullable(), reviewComment: z.string().nullable(), employeeNote: z.string().optional(), version: z.number().int().nonnegative().optional(), submittedBy: uuid.nullable().optional(), reviewerId: uuid.nullable().optional(), actionResults: z.array(z.boolean()).optional(), evidencePhotoIds: z.array(uuid).optional() });
+export const campaignResponseSchema = z.object({ id: uuid, title: z.string(), description: z.string(), status: campaignStatusSchema, startsAt: z.string().datetime(), endsAt: z.string().datetime(), timezone: z.string(), storeIds: z.array(uuid), referencePhotoIds: z.array(uuid).default([]), requiredActions: z.array(z.string()), requiresPhoto: z.boolean(), executions: z.array(campaignExecutionResponseSchema).optional(), createdAt: z.string().datetime() });
+export const campaignListResponseSchema = paginated(campaignResponseSchema);
+export const campaignTransitionResponseSchema = z.object({ id: uuid, status: campaignStatusSchema });
+export const campaignReviewResponseSchema = z.object({ id: uuid, status: campaignExecutionStatusSchema, comment: z.string().nullable() });
+export const campaignHistoryResponseSchema = z.object({ data: z.array(z.object({ id: uuid, executionId: uuid, actorId: uuid, action: z.string(), comment: z.string().nullable(), version: z.number().int().positive().optional(), createdAt: z.string().datetime() })) });
+
+export const merchandisingDisplayCreateSchema = z.object({ storeId: uuid, name: z.string().trim().min(1).max(200), brand: z.string().trim().max(120).default(""), referencePhotoId: uuid, checklist: z.array(z.string().trim().min(1).max(500)).max(30).default([]), campaignId: uuid.nullable().optional() });
+export const merchandisingDisplayUpdateSchema = z.object({ name: z.string().trim().min(1).max(200).optional(), brand: z.string().trim().max(120).optional(), referencePhotoId: uuid.optional(), checklist: z.array(z.string().trim().min(1).max(500)).optional(), active: z.boolean().optional() }).refine(v=>Object.keys(v).length>0,"Укажите поля выкладки");
+export const merchandisingDisplayResponseSchema = z.object({ id: uuid, storeId: uuid, name: z.string(), brand: z.string(), referencePhotoId: uuid, checklist: z.array(z.string()), campaignId: uuid.nullable(), active: z.boolean(), createdBy: uuid, createdAt: z.string().datetime(), updatedAt: z.string().datetime() });
+export const inspectionSubmitSchema = z.object({ actualPhotoId: uuid, checklistResults: z.array(z.boolean()).max(30), employeeNote: z.string().trim().max(2000).default(""), idempotencyKey: z.string().trim().min(8).max(128) });
+export const inspectionSubmissionResultSchema = z.object({ id: uuid, displayId: uuid, status: z.enum(["submitted", "checked", "rejected"]), version: z.number().int().positive(), submittedAt: z.string().datetime() });
+export const merchandisingReviewSchema = campaignReviewSchema;
+export const merchandisingQuerySchema = pageQuery.extend({ storeId: uuid.optional(), status: z.enum(["submitted", "checked", "rejected"]).optional(), active: queryBoolean.optional(), includeInactive: queryBoolean.optional() });
+export const inspectionResponseSchema = z.object({ id: uuid, displayId: uuid, displayName: z.string(), brand: z.string(), storeId: uuid, referencePhotoId: uuid, actualPhotoId: uuid.nullable(), checklist: z.array(z.string()), checklistResults: z.array(z.boolean()), status: z.enum(["submitted", "checked", "rejected", "draft"]), submittedBy: uuid.nullable(), reviewerId: uuid.nullable(), comment: z.string().nullable(), employeeNote: z.string().optional(), active: z.boolean().optional(), currentDisplay: z.object({ name: z.string(), brand: z.string(), referencePhotoId: uuid, checklist: z.array(z.string()), active: z.boolean() }).optional(), version: z.number().int().positive().nullable().optional(), submittedAt: z.string().datetime().nullable().optional(), reviewedAt: z.string().datetime().nullable().optional(), createdAt: z.string().datetime(), updatedAt: z.string().datetime() });
+export const merchandisingListResponseSchema = paginated(inspectionResponseSchema);
+export const inspectionHistoryResponseSchema = z.object({ data: z.array(z.object({ id: uuid, inspectionId: uuid, actorId: uuid, fromStatus: z.string(), toStatus: z.string(), comment: z.string().nullable(), createdAt: z.string().datetime() })) });
+export const inspectionReviewResponseSchema = z.object({ id: uuid, status: z.enum(["checked", "rejected"]), comment: z.string().nullable() });
+
+export const issueStatusSchema = z.enum(["open", "in_progress", "resolved", "closed"]);
+export const issueCreateSchema = z.object({ storeId: uuid, category: z.enum(["lighting", "shelving", "payment_terminal", "tester", "climate", "display", "equipment", "other"]), title: z.string().trim().min(1).max(200), description: z.string().trim().min(1).max(5000), priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"), photoIds: z.array(uuid).max(10).default([]).refine(v=>new Set(v).size===v.length,"Фото не должны повторяться") });
+export const issueUpdateSchema = z.object({ status: issueStatusSchema.optional(), assignedTo: uuid.nullable().optional(), resolutionNotes: z.string().trim().max(3000).optional(), reopenReason: z.string().trim().min(1).max(1000).optional() }).refine((v) => Object.keys(v).length > 0);
+export const issuePriorityChangeSchema = z.object({ priority: z.enum(["low", "normal", "high", "urgent"]), expectedPriority: z.enum(["low", "normal", "high", "urgent"]) }).refine(v=>v.priority!==v.expectedPriority,"Новый приоритет должен отличаться от текущего");
+export const issueQuerySchema = pageQuery.extend({ storeId: uuid.optional(), status: issueStatusSchema.optional(), priority: z.enum(["low", "normal", "high", "urgent"]).optional(), from: z.string().datetime().optional(), to: z.string().datetime().optional() }).refine(v=>!v.from||!v.to||v.from<=v.to,"Некорректный диапазон дат");
+export const issueResponseSchema = z.object({ id: uuid, storeId: uuid, category: z.string(), title: z.string(), description: z.string(), priority: z.enum(["low", "normal", "high", "urgent"]), photoIds: z.array(uuid), reporterId: uuid, assignedTo: uuid.nullable(), status: issueStatusSchema, resolutionNotes: z.string().nullable(), createdAt: z.string().datetime(), updatedAt: z.string().datetime(), resolvedAt: z.string().datetime().nullable() });
+export const issueListResponseSchema = paginated(issueResponseSchema);
+export const issueHistoryResponseSchema = z.object({ data: z.array(z.object({ id: uuid, issueId: uuid, actorId: uuid, action: z.string(), fromStatus: issueStatusSchema.nullable(), toStatus: issueStatusSchema.nullable(), reason: z.string().nullable(), previousPriority: z.string().nullable(), newPriority: z.string().nullable(), createdAt: z.string().datetime() })) });
+
+export const requestStatusSchema = z.enum(["submitted", "approved", "rejected", "in_progress", "completed"]);
+export const requestCreateSchema = z.object({ storeId: uuid, category: z.enum(["testers", "promotional_materials", "supplies", "assistance", "equipment", "other"]), description: z.string().trim().min(1).max(5000), quantity: z.string().trim().max(300).optional(), attachmentPhotoIds: z.array(uuid).max(10).default([]).refine(v=>new Set(v).size===v.length,"Фото не должны повторяться") });
+export const requestDecisionSchema = z.object({ decision: z.enum(["approved", "rejected"]), comment: z.string().trim().max(2000).default("") }).refine((v) => v.decision !== "rejected" || v.comment.length > 0);
+export const requestUpdateSchema = z.object({ status: z.enum(["in_progress", "completed"]).optional(), assignedTo: uuid.nullable().optional(), comment: z.string().trim().max(2000).optional() }).refine((v) => Object.keys(v).length > 0);
+export const requestQuerySchema = pageQuery.extend({ storeId: uuid.optional(), status: requestStatusSchema.optional(), from: z.string().datetime().optional(), to: z.string().datetime().optional() }).refine(v=>!v.from||!v.to||v.from<=v.to,"Некорректный диапазон дат");
+export const requestResponseSchema = z.object({ id: uuid, storeId: uuid, category: z.string(), description: z.string(), quantity: z.string().nullable(), attachmentPhotoIds: z.array(uuid), requesterId: uuid, assignedTo: uuid.nullable(), status: requestStatusSchema, decisionComment: z.string().nullable(), createdAt: z.string().datetime(), updatedAt: z.string().datetime() });
+export const requestListResponseSchema = paginated(requestResponseSchema);
+export const requestHistoryResponseSchema = z.object({ data: z.array(z.object({ id: uuid, requestId: uuid, actorId: uuid, fromStatus: requestStatusSchema.nullable(), toStatus: requestStatusSchema, comment: z.string().nullable(), createdAt: z.string().datetime() })) });
+export const requestDecisionResponseSchema = z.object({ id: uuid, status: z.enum(["approved", "rejected"]), comment: z.string() });
+
+export const operationHistoryResponseSchema = z.object({ id: uuid, actorId: uuid, action: z.string().optional(), fromStatus: z.string().nullable(), toStatus: z.string(), comment: z.string().nullable(), previousPriority: z.enum(["low","normal","high","urgent"]).nullable().optional(), newPriority: z.enum(["low","normal","high","urgent"]).nullable().optional(), createdAt: z.string().datetime() });
+export type CampaignCreate = z.infer<typeof campaignCreateSchema>;
+export type CampaignAction = z.infer<typeof campaignActionSchema>;
+export type CampaignUpdate = z.infer<typeof campaignUpdateSchema>;
+export type CampaignResponse = z.infer<typeof campaignResponseSchema>;
+export type CampaignExecutionResponse = z.infer<typeof campaignExecutionResponseSchema>;
+export type MerchandisingDisplayResponse = z.infer<typeof merchandisingDisplayResponseSchema>;
+export type InspectionResponse = z.infer<typeof inspectionResponseSchema>;
+export type MerchandisingDisplayCreate = z.infer<typeof merchandisingDisplayCreateSchema>;
+export type MerchandisingDisplayUpdate = z.infer<typeof merchandisingDisplayUpdateSchema>;
+export type IssueCreate = z.infer<typeof issueCreateSchema>;
+export type IssueResponse = z.infer<typeof issueResponseSchema>;
+export type IssueUpdate = z.infer<typeof issueUpdateSchema>;
+export type IssuePriorityChange = z.infer<typeof issuePriorityChangeSchema>;
+export type RequestCreate = z.infer<typeof requestCreateSchema>;
+export type RequestResponse = z.infer<typeof requestResponseSchema>;
+export type RequestUpdate = z.infer<typeof requestUpdateSchema>;
+export type RequestDecision = z.infer<typeof requestDecisionSchema>;

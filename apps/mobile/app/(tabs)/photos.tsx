@@ -11,6 +11,7 @@ import { useAuth } from '../../src/auth/auth-context'
 import { preparePhoto } from '../../src/photos/image-processing'
 import { canStartUpload, createQueueItem, markFailed, markUploaded, markUploading, type UploadQueueItem } from '../../src/photos/upload-queue'
 import { availableStoreSelection, isAuthorizedStore } from '../../src/photos/store-selection'
+import { clearPrivateMediaCache, deletePrivateMediaCacheFile, didStoreContextChange } from '../../src/photos/private-media-cache'
 import { useAppTheme } from '../../src/theme'
 import type { PhotoReportResponse, StoreResponse } from '@vizaje/contracts'
 
@@ -57,6 +58,8 @@ export default function PhotosScreen() {
 	const [resubmittingId, setResubmittingId] = useState<string | null>(null)
 	const imageRequests = useRef(new Set<string>())
 	const imageUrisRef = useRef<Record<string, string>>({})
+	const selectedStoreIdRef = useRef<string | null | undefined>(undefined)
+	const historyRequestRef = useRef(0)
 	const uploadAbortRef = useRef<AbortController | null>(null)
 	const cancelUploadRef = useRef(false)
 
@@ -68,8 +71,29 @@ export default function PhotosScreen() {
 		setSelectedStoreId(storeSelection.selectedStoreId)
 	}, [storeSelection.selectedStoreId])
 
+	useEffect(() => () => {
+		historyRequestRef.current += 1
+	}, [])
+
+	useEffect(() => {
+		const nextStoreId = storeSelection.selectedStoreId
+		if (didStoreContextChange(selectedStoreIdRef.current, nextStoreId)) {
+			historyRequestRef.current += 1
+			setHistory([])
+			setHistoryError(null)
+			setHistoryPage(1)
+			setHistoryTotalPages(0)
+			setImageUris({})
+			imageUrisRef.current = {}
+			imageRequests.current.clear()
+			void clearPrivateMediaCache()
+		}
+		selectedStoreIdRef.current = nextStoreId
+	}, [storeSelection.selectedStoreId])
+
 	const loadHistory = useCallback(async (page = 1, reset = true) => {
 		const storeId = storeSelection.selectedStoreId
+		const requestId = ++historyRequestRef.current
 		if (!isAuthorizedStore(stores, storeId)) {
 			setHistoryLoading(false)
 			setHistoryRefreshing(false)
@@ -83,6 +107,7 @@ export default function PhotosScreen() {
 		setHistoryError(null)
 		try {
 			const response = await requestAuthenticated((token) => listMyPhotoReports(token, { storeId, page, pageSize: MAX_HISTORY_PAGE_SIZE }))
+			if (requestId !== historyRequestRef.current) return
 			setHistory((current) => reset ? response.data : [...current, ...response.data.filter((item) => !current.some((existing) => existing.id === item.id))])
 			setHistoryPage(response.pagination.page)
 			setHistoryTotalPages(response.pagination.totalPages)
@@ -91,6 +116,10 @@ export default function PhotosScreen() {
 				imageRequests.current.add(photo.id)
 				try {
 					const uri = await requestAuthenticated((token) => downloadPhotoImage(token, photo))
+					if (requestId !== historyRequestRef.current) {
+						await deletePrivateMediaCacheFile(uri)
+						return
+					}
 					setImageUris((current) => {
 						const next = { ...current, [photo.id]: uri }
 						imageUrisRef.current = next
@@ -103,10 +132,12 @@ export default function PhotosScreen() {
 				}
 			}))
 		} catch (error) {
-			setHistoryError(errorMessage(error))
+			if (requestId === historyRequestRef.current) setHistoryError(errorMessage(error))
 		} finally {
-			setHistoryLoading(false)
-			setHistoryRefreshing(false)
+			if (requestId === historyRequestRef.current) {
+				setHistoryLoading(false)
+				setHistoryRefreshing(false)
+			}
 		}
 	}, [requestAuthenticated, storeSelection.selectedStoreId, stores])
 

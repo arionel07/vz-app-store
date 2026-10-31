@@ -52,3 +52,50 @@ mobile bearer session and stores only a device identifier in SecureStore;
 logout removes that device registration. Expo push delivery also requires an
 EAS project ID in `expo.extra.eas.projectId`. The inbox remains usable when
 permission is denied or the provider is unavailable.
+
+## Retail operations (M19.3)
+
+From Home, **Операции** opens an employee flow without adding a bottom tab.
+Choose one of the currently assigned active stores, then use **Акции**,
+**Выкладка**, **Сообщить о проблеме**, or **Мои заявки**. Store IDs in links
+are checked against the authenticated profile on every screen; the API also
+enforces live membership and operation-level permissions.
+
+Campaigns display only published work available to the employee's stores.
+Employees can complete the configured action checklist, attach an optional or
+required photo, add a saved note, submit, and view review status/comments and
+submission history. Rejected submissions can be corrected and sent again.
+Merchandising shows the reference photo separately from the employee's actual
+photo, checklist, review result, note, and audit history; rejected inspections
+can be resubmitted. Issues and operational requests support creation with
+optional photo evidence and details/history for records reported by the
+employee. Admin/manager-only transitions remain unavailable in the mobile UI.
+
+Camera and gallery permissions are requested only after the employee taps the
+corresponding action. Images are resized/converted to JPEG and constrained by
+the existing upload size limit before upload. Uploads happen in the foreground;
+there is no offline queue. Upload and submission requests use idempotency keys
+so a retry after a lost response does not create duplicate records. Private
+operation evidence is fetched through the parent-record authorization endpoint
+with the current bearer session, written to a temporary cache file, and removed
+when the preview is unmounted. App-owned private photo/evidence cache files are
+also cleared on logout and when the selected store context changes. No storage
+URLs, keys, or access tokens are written into operation records or logs.
+
+Operation notification links resolve the target against the current employee's
+authorized campaigns, inspections, issues, and requests before navigating.
+The payload is never treated as authorization. Missing, stale, cross-store, or
+revoked targets show a safe unavailable state. A removed membership is checked
+again on refresh and private media requests; records are not persisted as an
+offline cache.
+
+Real-device QA is still required for camera/gallery permission prompts, HEIC
+selection and conversion, private image preview and cache cleanup, app resume,
+network loss during multipart upload, and opening operation push links on iOS
+and Android. Campaign and inspection history uses the API's supported versions;
+the API currently does not expose a separate employee-readable history for
+every operation type. Assignment details expose a responsible-user ID but no
+authorized name lookup endpoint, so the UI reports that an assignee exists
+without displaying the raw ID. Campaigns, issues, and requests accept up to five
+evidence photos per submission; merchandising inspections use one actual photo
+per inspection, matching the API contract.

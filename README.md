@@ -4,7 +4,7 @@ Foundation monorepo for Vizaje Staff.
 
 ## Stack
 
-- Bun 1.3.x + Hono + TypeScript
+- Bun 1.4.4 + Hono + TypeScript
 - PostgreSQL 16
 - Drizzle ORM and Drizzle Kit
 - Zod
@@ -28,7 +28,7 @@ vizaje-staff/
 
 ## Prerequisites
 
-- Bun 1.3.x. Install from <https://bun.sh> if it is not available.
+- Bun 1.4.4 (pinned in `package.json`). This version includes current ICU timezone data required for deterministic IANA DST validation. Install from <https://bun.sh> if it is not available.
 - Docker Engine with Docker Compose.
 
 ## Local setup
@@ -138,6 +138,14 @@ docker compose -f infra/docker-compose.yml up -d postgres
 bun run db:migrate
 RUN_INTEGRATION_TESTS=1 bun test
 ```
+
+## Retail operations
+
+Milestone 19 adds store-scoped campaigns, merchandising inspections, maintenance
+issues, and operational requests across the Admin, API, PostgreSQL, Mobile, and
+notification outbox. Workflow states, API routes, role/store boundaries, private
+evidence behavior, notification events, migrations, and isolated test commands
+are documented in [`docs/retail-operations.md`](docs/retail-operations.md).
 
 ## Photo Uploads
 

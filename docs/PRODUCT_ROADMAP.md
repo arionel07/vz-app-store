@@ -144,7 +144,7 @@ Notification integration tests cover recipient scope, inbox dedupe, push deliver
 | Tasks/checklists | Implemented | Milestone 16; scoped templates, occurrences, checklists, private evidence, review history, Admin and Mobile clients |
 | In-app/push notifications and announcements | Implemented in Milestone 17 | Milestone 18+ extensions |
 | Knowledge base | Implemented in Milestone 18 | Milestone 19+ extensions |
-| Retail operations | Not implemented | Milestone 19 |
+| Retail operations | M19.1 Backend, M19.2 Admin, and M19.3 Mobile are implemented in the current working tree | M19.4 final integration, regression and release acceptance |
 | Advanced reporting | Not implemented | Milestone 20 |
 
 ## 4. Proposed module boundaries
@@ -531,6 +531,8 @@ Dependencies: role/store visibility policy, private media attachments, optional 
 
 ### Milestone 19 — Retail operations
 
+**Status update (2026-10-31):** M19.1 Backend, M19.2 Admin, and M19.3 Mobile passed M19.4 automated functional acceptance, including two isolated PostgreSQL suite runs, real HTTP workflows, RBAC/evidence checks, notification processing, and Admin browser QA. Physical-device acceptance and production readiness remain separate release gates; neither is claimed here.
+
 Dependencies: photos/review, tasks, knowledge, notifications, and stable store scope.
 
 - **Backend:** Add campaign execution, merchandising checks, reference/submitted media links, maintenance issues, and operational requests as separate bounded modules.
@@ -540,6 +542,19 @@ Dependencies: photos/review, tasks, knowledge, notifications, and stable store s
 - **Database migrations:** Add campaign/check/issue/request tables and references to existing stores/users/media/tasks.
 - **Automated tests:** Scope, evidence privacy, state transitions, assignment, audit, idempotency, and notification events.
 - **Acceptance criteria:** Each operational workflow has a documented owner, status model, and store-scope rule; no module uses an unbounded generic workflow or bypasses existing authorization.
+
+M19 API integration tests require a disposable PostgreSQL database. Never reuse
+development or production data. Use Bun 1.4.4 or newer with current IANA timezone
+data; Bun 1.3.6's ICU 75.1 resolves the 2026 Chisinau DST gap incorrectly. The
+operations-specific procedures and state/authorization matrices are in
+[`retail-operations.md`](retail-operations.md). M19 acceptance distinguishes
+automated functional tests, browser visual review, physical-device QA, and
+production readiness; passing one does not imply the others.
+
+Automated and browser functional acceptance passed on 2026-10-31. Native
+camera/gallery, HEIC conversion on device, deep links, and upload behavior under
+real mobile network interruptions remain pending physical-device QA. Production
+deployment, push-provider configuration, and monitoring remain release work.
 
 ### Milestone 20 — Advanced reporting
 
@@ -617,4 +632,4 @@ These questions should be answered before implementation of the corresponding mi
 
 The current repository is not missing a backend foundation; it has a working identity/store/authentication layer, private photo storage, revisioned quizzes, results, dashboard aggregates, and explicit Admin/Mobile clients. The future work is additive domain expansion.
 
-Milestones 12–18 address employee profiles, photo review, the advanced revisioned quiz engine, work schedules, retail tasks/checklists, notifications/announcements, and the scoped knowledge base. Retail operations and advanced reporting remain future milestones.
+Milestones 12–18 address employee profiles, photo review, the advanced revisioned quiz engine, work schedules, retail tasks/checklists, notifications/announcements, and the scoped knowledge base. Retail operations M19.1–M19.4 are implemented and functionally accepted. Physical-device validation and production readiness remain explicit release gates. Advanced reporting remains M20 and is outside the scope of the completed work.

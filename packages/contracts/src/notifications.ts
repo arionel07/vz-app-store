@@ -9,9 +9,10 @@ export const notificationTargetSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("schedule"), id: z.string().uuid() }),
   z.object({ kind: z.literal("announcement"), id: z.string().uuid() }),
   z.object({ kind: z.literal("knowledge"), id: z.string().uuid() }),
+  z.object({ kind: z.literal("operation"), id: z.string().uuid() }),
 ]);
 
-export const notificationCategorySchema = z.enum(["task", "quiz", "schedule", "photo", "announcement", "knowledge"]);
+export const notificationCategorySchema = z.enum(["task", "quiz", "schedule", "photo", "announcement", "knowledge", "operations"]);
 export const notificationListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(30),
@@ -50,6 +51,7 @@ export const notificationPreferencesSchema = z.object({
   scheduleNotifications: z.boolean(),
   photoReviewNotifications: z.boolean(),
   announcementNotifications: z.boolean(),
+  operationsNotifications: z.boolean(),
 });
 export const notificationPreferencesUpdateSchema = notificationPreferencesSchema.partial().refine((value) => Object.keys(value).length > 0, "Укажите хотя бы одну настройку");
 export const pushDeviceRegistrationSchema = z.object({

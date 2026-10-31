@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { acknowledgeKnowledgeArticle, getAvailableQuiz, getCurrentUser, getMyProfile, getNotificationUnreadCount, listKnowledgeArticles, listMyNotifications, listAvailableQuizzes, listMyAttempts, mobileLogin, redeemActivation, registerPushDevice, resolveApiOrigin, startQuizAttempt, submitQuizAttempt, uploadPhoto, uploadQuizAnswerPhoto } from '../src/api/client'
+import { acknowledgeKnowledgeArticle, createOperationIssue, createOperationRequest, getAvailableQuiz, getCurrentUser, getOperationCampaignHistory, getOperationInspection, getMyProfile, getNotificationUnreadCount, listKnowledgeArticles, listMyNotifications, listAvailableQuizzes, listMyAttempts, listMyOperationIssues, listMyOperationRequests, listOperationCampaigns, listOperationDisplays, mobileLogin, operationEvidencePath, redeemActivation, registerPushDevice, resolveApiOrigin, startQuizAttempt, submitOperationCampaign, submitOperationInspection, submitQuizAttempt, uploadPhoto, uploadQuizAnswerPhoto } from '../src/api/client'
 import { mobileLoginErrorMessage } from '../src/auth/login-errors'
 
 process.env.EXPO_PUBLIC_API_URL ??= 'http://127.0.0.1:3000'
@@ -240,5 +240,93 @@ describe('mobile API client', () => {
 		}) as typeof fetch
 		expect((await listKnowledgeArticles('access-token')).data[0]?.title).toBe('Материал')
 		expect((await acknowledgeKnowledgeArticle('access-token', articleId)).articleId).toBe(articleId)
+	})
+
+	test('loads all operation lists only through authenticated employee-scoped endpoints', async () => {
+		const storeId = '77777777-7777-4777-8777-777777777777'
+		const urls: string[] = []
+		globalThis.fetch = (async (input, init) => {
+			urls.push(String(input))
+			expect(init?.headers).toMatchObject({ Authorization: 'Bearer access-token' })
+			return new Response(JSON.stringify({ data: [], pagination: { page: 1, pageSize: 100, total: 0, totalPages: 0 } }))
+		}) as typeof fetch
+		expect((await listOperationCampaigns('access-token', { storeId })).data).toEqual([])
+		expect((await listOperationDisplays('access-token', storeId)).data).toEqual([])
+		expect((await listMyOperationIssues('access-token', storeId)).data).toEqual([])
+		expect((await listMyOperationRequests('access-token', storeId)).data).toEqual([])
+		expect(urls).toHaveLength(4)
+		expect(urls.every((url) => url.includes(`storeId=${storeId}`))).toBe(true)
+		expect(urls.some((url) => url.includes('/api/v1/management/'))).toBe(false)
+	})
+
+	test('sends campaign and merchandising submissions once with validated idempotency payloads', async () => {
+		const recordId = '11111111-1111-4111-8111-111111111111'
+		const storeId = '77777777-7777-4777-8777-777777777777'
+		const photoId = '66666666-6666-4666-8666-666666666666'
+		const secondPhotoId = '55555555-5555-4555-8555-555555555555'
+		let calls = 0
+		globalThis.fetch = (async (input, init) => {
+			calls += 1
+			expect(init?.method).toBe('POST')
+			expect(init?.headers).toMatchObject({ Authorization: 'Bearer access-token' })
+			const body = JSON.parse(String(init?.body))
+			if (String(input).includes('/campaigns/')) {
+				expect(String(input)).toContain(`/campaigns/${recordId}/stores/${storeId}/submit`)
+				expect(body).toMatchObject({ employeeNote: 'Проверено', idempotencyKey: 'campaign-key-1', photoIds: [photoId, secondPhotoId] })
+				return new Response(JSON.stringify({ id: recordId, status: 'submitted', submittedAt: '2026-01-01T00:00:00.000Z', version: 1 }))
+			}
+			expect(String(input)).toContain(`/merchandising/displays/${recordId}/inspections`)
+			expect(body).toMatchObject({ employeeNote: 'Выкладка проверена', actualPhotoId: photoId, idempotencyKey: 'inspection-key-1' })
+			return new Response(JSON.stringify({ id: '22222222-2222-4222-8222-222222222222', displayId: recordId, status: 'submitted', version: 1, submittedAt: '2026-01-01T00:00:00.000Z' }), { status: 201 })
+		}) as typeof fetch
+		await submitOperationCampaign('access-token', recordId, storeId, { actionResults: [true], photoIds: [photoId, secondPhotoId], employeeNote: 'Проверено', idempotencyKey: 'campaign-key-1' })
+		await submitOperationInspection('access-token', recordId, { actualPhotoId: photoId, checklistResults: [true], employeeNote: 'Выкладка проверена', idempotencyKey: 'inspection-key-1' })
+		expect(calls).toBe(2)
+	})
+
+	test('creates issues and requests with stable Idempotency-Key headers and typed responses', async () => {
+		const storeId = '77777777-7777-4777-8777-777777777777'
+		const reporterId = user.id
+		const issueId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+		const requestId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+		const photoIds = ['66666666-6666-4666-8666-666666666666', '55555555-5555-4555-8555-555555555555']
+		let calls = 0
+		globalThis.fetch = (async (input, init) => {
+			calls += 1
+			expect(init?.method).toBe('POST')
+			expect(init?.headers).toMatchObject({ Authorization: 'Bearer access-token', 'Idempotency-Key': calls === 1 ? 'issue-key-123' : 'request-key-123' })
+			const body = JSON.parse(String(init?.body))
+			const now = '2026-01-01T00:00:00.000Z'
+			if (String(input).endsWith('/issues')) {
+				expect(body.photoIds).toEqual(photoIds)
+				return new Response(JSON.stringify({ id: issueId, storeId, category: 'equipment', title: 'Свет', description: 'Не работает', priority: 'normal', photoIds, reporterId, assignedTo: null, status: 'open', resolutionNotes: null, createdAt: now, updatedAt: now, resolvedAt: null }), { status: 201 })
+			}
+			expect(body.attachmentPhotoIds).toEqual(photoIds)
+			return new Response(JSON.stringify({ id: requestId, storeId, category: 'supplies', description: 'Перчатки', quantity: null, attachmentPhotoIds: photoIds, requesterId: reporterId, assignedTo: null, status: 'submitted', decisionComment: null, createdAt: now, updatedAt: now }), { status: 201 })
+		}) as typeof fetch
+		expect((await createOperationIssue('access-token', { storeId, category: 'equipment', title: 'Свет', description: 'Не работает', priority: 'normal', photoIds }, 'issue-key-123')).id).toBe(issueId)
+		expect((await createOperationRequest('access-token', { storeId, category: 'supplies', description: 'Перчатки', attachmentPhotoIds: photoIds }, 'request-key-123')).id).toBe(requestId)
+		expect(calls).toBe(2)
+	})
+
+	test('maps operation permission/conflict/network failures and builds a private evidence route', async () => {
+		const id = '11111111-1111-4111-8111-111111111111'
+		expect(operationEvidencePath('store_issue', id, 'photo/a')).toBe(`/api/v1/operations/evidence/store_issue/${id}/photo%2Fa`)
+		globalThis.fetch = (async () => new Response(JSON.stringify({ error: { code: 'STORE_FORBIDDEN', message: 'no' } }), { status: 403 })) as unknown as typeof fetch
+		await expect(listMyOperationIssues('access-token', '77777777-7777-4777-8777-777777777777')).rejects.toMatchObject({ status: 403 })
+		globalThis.fetch = (async () => new Response(JSON.stringify({ error: { code: 'IDEMPOTENCY_CONFLICT', message: 'conflict' } }), { status: 409 })) as unknown as typeof fetch
+		await expect(createOperationRequest('access-token', { storeId: '77777777-7777-4777-8777-777777777777', category: 'other', description: 'Запрос', attachmentPhotoIds: [] }, 'request-key-123')).rejects.toMatchObject({ status: 409 })
+	})
+
+	test('resolves operation notification targets through authorized typed detail/history APIs', async () => {
+		const id = '11111111-1111-4111-8111-111111111111'
+		const now = '2026-01-01T00:00:00.000Z'
+		globalThis.fetch = (async (input, init) => {
+			expect(init?.headers).toMatchObject({ Authorization: 'Bearer access-token' })
+			if (String(input).endsWith(`/merchandising/inspections/${id}`)) return new Response(JSON.stringify({ id, displayId: '22222222-2222-4222-8222-222222222222', displayName: 'Витрина', brand: 'Марка', storeId: photo.storeId, referencePhotoId: photo.id, actualPhotoId: null, checklist: [], checklistResults: [], status: 'submitted', submittedBy: user.id, reviewerId: null, comment: null, employeeNote: 'Готово', active: true, currentDisplay: { name: 'Витрина', brand: 'Марка', referencePhotoId: photo.id, checklist: [], active: true }, version: 1, submittedAt: now, reviewedAt: null, createdAt: now, updatedAt: now }))
+			return new Response(JSON.stringify({ data: [{ id: '33333333-3333-4333-8333-333333333333', executionId: id, actorId: user.id, action: 'submitted', comment: 'Проверено', version: 1, createdAt: now }] }))
+		}) as typeof fetch
+		expect((await getOperationInspection('access-token', id)).employeeNote).toBe('Готово')
+		expect((await getOperationCampaignHistory('access-token', id)).data[0]?.comment).toBe('Проверено')
 	})
 })

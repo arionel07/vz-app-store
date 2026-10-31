@@ -29,6 +29,7 @@ describe('mobile navigation safety', () => {
 		expect(authRedirect('unauthenticated', undefined)).toBe('/activation')
 		expect(authRedirect('unauthenticated', '(tabs)')).toBe('/activation')
 		expect(authRedirect('unauthenticated', 'profile')).toBe('/activation')
+		expect(authRedirect('unauthenticated', 'operations')).toBe('/activation')
 	})
 
 	test('opens authenticated initial navigation at home', () => {
@@ -58,6 +59,8 @@ describe('mobile navigation safety', () => {
 		expect(notificationTargetHref({ kind: 'photo_report', id: '11111111-1111-4111-8111-111111111111' })).toBe('/(tabs)/photos')
 		expect(notificationTargetHref({ kind: 'announcement', id: '11111111-1111-4111-8111-111111111111' })).toBe('/announcement/11111111-1111-4111-8111-111111111111')
 	expect(notificationTargetHref({ kind: 'knowledge', id: '11111111-1111-4111-8111-111111111111' })).toBe('/knowledge/11111111-1111-4111-8111-111111111111')
+		expect(notificationTargetHref({ kind: 'operation', id: '11111111-1111-4111-8111-111111111111' })).toBe('/operations/record/11111111-1111-4111-8111-111111111111')
+		expect(authRedirect('unauthenticated', 'operations')).toBe('/activation')
 		expect(authRedirect('unauthenticated', 'notifications')).toBe('/activation')
 		expect(authRedirect('authenticated', 'announcement')).toBeNull()
 	})

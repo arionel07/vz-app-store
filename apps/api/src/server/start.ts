@@ -16,6 +16,7 @@ import { createPhotoStorage } from "../storage/photo-storage";
 import { createShutdownHandler } from "./shutdown";
 import { createNotificationsService } from "../domain/notifications/service";
 import { createKnowledgeService } from "../domain/knowledge/service";
+import { OperationsService } from "../domain/operations/service";
 
 export function startServer() {
   const env = loadEnv();
@@ -84,6 +85,10 @@ export function startServer() {
       }),
       resolvePrincipal: auth.principalResolver(),
       maxUploadBytes: env.PHOTO_MAX_BYTES,
+    },
+    operationsRoutes: {
+      operations: new OperationsService(db, photoStorage),
+      resolvePrincipal: auth.principalResolver(),
     },
     logger,
   });

@@ -60,6 +60,29 @@ import {
 	type NotificationPreferences,
 	type PushDeviceRegistration,
 	type AnnouncementRecipientResponse,
+	campaignListResponseSchema,
+	campaignResponseSchema,
+	campaignSubmissionSchema,
+	campaignSubmissionResultSchema,
+	campaignHistoryResponseSchema,
+	merchandisingListResponseSchema,
+	inspectionResponseSchema,
+	inspectionSubmitSchema,
+	inspectionSubmissionResultSchema,
+	inspectionHistoryResponseSchema,
+	issueListResponseSchema,
+	issueResponseSchema,
+	issueHistoryResponseSchema,
+	issueCreateSchema,
+	requestListResponseSchema,
+	requestResponseSchema,
+	requestHistoryResponseSchema,
+	requestCreateSchema,
+	type CampaignResponse,
+	type IssueCreate,
+	type IssueResponse,
+	type RequestCreate,
+	type RequestResponse,
 } from '@vizaje/contracts'
 
 const REQUEST_TIMEOUT_MS = 10_000
@@ -520,4 +543,109 @@ export function removePushDevice(token: string, deviceId: string): Promise<{ suc
 
 export function getMyAnnouncement(token: string, announcementId: string): Promise<AnnouncementRecipientResponse> {
 	return requestJson(`/api/v1/me/announcements/${encodeURIComponent(announcementId)}`, announcementRecipientResponseSchema, { token, allowRetry: true })
+}
+
+function operationQuery(query: { page?: number; pageSize?: number; storeId?: string; status?: string }): string {
+	const params = new URLSearchParams({ page: String(query.page ?? 1), pageSize: String(query.pageSize ?? 50) })
+	if (query.storeId) params.set('storeId', query.storeId)
+	if (query.status) params.set('status', query.status)
+	return params.toString()
+}
+
+export function listOperationCampaigns(token: string, query: { page?: number; pageSize?: number; storeId?: string } = {}) {
+	return requestJson(`/api/v1/operations/campaigns?${operationQuery(query)}`, campaignListResponseSchema, { token, allowRetry: true })
+}
+
+export function getOperationCampaign(token: string, campaignId: string): Promise<CampaignResponse> {
+	return requestJson(`/api/v1/operations/campaigns/${encodeURIComponent(campaignId)}`, campaignResponseSchema, { token, allowRetry: true })
+}
+
+export function getOperationCampaignHistory(token: string, campaignId: string) {
+	return requestJson(`/api/v1/operations/campaigns/${encodeURIComponent(campaignId)}/history`, campaignHistoryResponseSchema, { token, allowRetry: true })
+}
+
+export function submitOperationCampaign(token: string, campaignId: string, storeId: string, input: { actionResults: boolean[]; photoIds: string[]; employeeNote?: string; idempotencyKey: string }) {
+	const body = campaignSubmissionSchema.parse(input)
+	return requestJson(`/api/v1/operations/campaigns/${encodeURIComponent(campaignId)}/stores/${encodeURIComponent(storeId)}/submit`, campaignSubmissionResultSchema, { method: 'POST', token, body })
+}
+
+export function listOperationDisplays(token: string, storeId: string) {
+	return requestJson(`/api/v1/operations/merchandising?${operationQuery({ storeId, pageSize: 100 })}`, merchandisingListResponseSchema, { token, allowRetry: true })
+}
+
+export function submitOperationInspection(token: string, displayId: string, input: { actualPhotoId: string; checklistResults: boolean[]; employeeNote?: string; idempotencyKey: string }) {
+	const body = inspectionSubmitSchema.parse(input)
+	return requestJson(`/api/v1/operations/merchandising/displays/${encodeURIComponent(displayId)}/inspections`, inspectionSubmissionResultSchema, { method: 'POST', token, body })
+}
+
+export function getOperationInspectionHistory(token: string, inspectionId: string) {
+	return requestJson(`/api/v1/operations/merchandising/inspections/${encodeURIComponent(inspectionId)}/history`, inspectionHistoryResponseSchema, { token, allowRetry: true })
+}
+
+export function getOperationInspection(token: string, inspectionId: string) {
+	return requestJson(`/api/v1/operations/merchandising/inspections/${encodeURIComponent(inspectionId)}`, inspectionResponseSchema, { token, allowRetry: true })
+}
+
+export function listMyOperationIssues(token: string, storeId: string) {
+	return requestJson(`/api/v1/operations/issues?${operationQuery({ storeId, pageSize: 100 })}`, issueListResponseSchema, { token, allowRetry: true })
+}
+
+export function getMyOperationIssue(token: string, issueId: string): Promise<IssueResponse> {
+	return requestJson(`/api/v1/operations/issues/${encodeURIComponent(issueId)}`, issueResponseSchema, { token, allowRetry: true })
+}
+
+export function getMyOperationIssueHistory(token: string, issueId: string) {
+	return requestJson(`/api/v1/operations/issues/${encodeURIComponent(issueId)}/history`, issueHistoryResponseSchema, { token, allowRetry: true })
+}
+
+export function createOperationIssue(token: string, input: IssueCreate, idempotencyKey: string): Promise<IssueResponse> {
+	return requestJson('/api/v1/operations/issues', issueResponseSchema, { method: 'POST', token, body: issueCreateSchema.parse(input), idempotencyKey })
+}
+
+export function listMyOperationRequests(token: string, storeId: string) {
+	return requestJson(`/api/v1/operations/requests?${operationQuery({ storeId, pageSize: 100 })}`, requestListResponseSchema, { token, allowRetry: true })
+}
+
+export function getMyOperationRequest(token: string, requestId: string): Promise<RequestResponse> {
+	return requestJson(`/api/v1/operations/requests/${encodeURIComponent(requestId)}`, requestResponseSchema, { token, allowRetry: true })
+}
+
+export function getMyOperationRequestHistory(token: string, requestId: string) {
+	return requestJson(`/api/v1/operations/requests/${encodeURIComponent(requestId)}/history`, requestHistoryResponseSchema, { token, allowRetry: true })
+}
+
+export function createOperationRequest(token: string, input: RequestCreate, idempotencyKey: string): Promise<RequestResponse> {
+	return requestJson('/api/v1/operations/requests', requestResponseSchema, { method: 'POST', token, body: requestCreateSchema.parse(input), idempotencyKey })
+}
+
+export type OperationEvidenceKind = 'campaign_reference' | 'campaign_execution' | 'campaign_submission' | 'merchandising_display' | 'merchandising_inspection' | 'store_issue' | 'operational_request'
+let evidenceFileSequence = 0
+
+export function operationEvidencePath(kind: OperationEvidenceKind, recordId: string, photoId: string): string {
+	return `/api/v1/operations/evidence/${kind}/${encodeURIComponent(recordId)}/${encodeURIComponent(photoId)}`
+}
+
+/** Downloads operation evidence using parent-scoped authorization, never a public/storage URL. */
+export async function downloadOperationEvidence(token: string, kind: OperationEvidenceKind, recordId: string, photoId: string): Promise<string> {
+	const FileSystem = await import('expo-file-system/legacy')
+	if (!FileSystem.cacheDirectory) throw new ApiError(0, 'CACHE_UNAVAILABLE', 'Временное хранилище недоступно')
+	const fileStem = `${FileSystem.cacheDirectory}vizaje-operation-${Date.now()}-${++evidenceFileSequence}`
+	const target = `${fileStem}.download`
+	try {
+		const result = await FileSystem.downloadAsync(`${apiOrigin()}${operationEvidencePath(kind, recordId, photoId)}`, target, { headers: { Authorization: `Bearer ${token}`, Accept: 'image/*' } })
+		if (result.status < 200 || result.status >= 300) {
+			await FileSystem.deleteAsync(result.uri, { idempotent: true }).catch(() => undefined)
+			throw new ApiError(result.status, result.status === 403 ? 'FORBIDDEN' : result.status === 404 ? 'EVIDENCE_NOT_FOUND' : 'EVIDENCE_DOWNLOAD_FAILED', 'Не удалось загрузить фотографию')
+		}
+		const extension = result.mimeType === 'image/png' ? 'png' : result.mimeType === 'image/webp' ? 'webp' : result.mimeType === 'image/jpeg' ? 'jpg' : null
+		if (!extension) { await FileSystem.deleteAsync(result.uri, { idempotent: true }).catch(() => undefined); throw new ApiError(502, 'INVALID_EVIDENCE_TYPE', 'Формат фотографии не поддерживается') }
+		const imageUri = `${fileStem}.${extension}`
+		try { await FileSystem.moveAsync({ from: result.uri, to: imageUri }) }
+		catch { await FileSystem.deleteAsync(result.uri, { idempotent: true }).catch(() => undefined); throw new ApiError(0, 'CACHE_WRITE_FAILED', 'Не удалось сохранить фотографию во временное хранилище') }
+		return imageUri
+	} catch (error) {
+		if (error instanceof ApiError) throw error
+		await FileSystem.deleteAsync(target, { idempotent: true }).catch(() => undefined)
+		throw new ApiError(0, 'NETWORK_UNAVAILABLE', 'Сервис временно недоступен')
+	}
 }

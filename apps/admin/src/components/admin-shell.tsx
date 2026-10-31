@@ -27,6 +27,7 @@ import {
 	LoaderCircle,
 	Megaphone,
 	BookOpen,
+	ClipboardCheck,
 } from 'lucide-react'
 import { cn } from 'cn'
 import { getBrowserCsrfToken } from '@/lib/auth-client'
@@ -43,6 +44,7 @@ const navItems = [
 	{ label: 'Задания', icon: ListChecks, value: 'tasks' },
 	{ label: 'Объявления', icon: Megaphone, value: 'announcements' },
 	{ label: 'База знаний', icon: BookOpen, value: 'knowledge' },
+	{ label: 'Операции', icon: ClipboardCheck, value: 'operations' },
 ]
 
 export function ThemeSwitcher() {
@@ -126,6 +128,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
 				<nav className="sidebar-nav" aria-label="Основная навигация">
 					<p className="sidebar-label">Рабочая область</p>
 					{navItems.map(({ label, icon: Icon, value }) => {
+						if (value === 'operations') {
+							const active = pathname.startsWith('/operations')
+							return <div key={value} className="nav-group"><button type="button" className={cn('nav-item', active && 'nav-item-active')} onClick={() => router.push('/operations/campaigns')}><Icon size={17} strokeWidth={1.8} /><span>{label}</span>{active && <span className="nav-active-dot" />}</button>{active && <div className="nav-subitems">{[
+								{ label: 'Кампании', path: '/operations/campaigns' }, { label: 'Выкладка', path: '/operations/merchandising' }, { label: 'Проблемы', path: '/operations/issues' }, { label: 'Заявки', path: '/operations/requests' },
+							].map((item) => <button key={item.path} type="button" className={cn('nav-subitem', pathname === item.path && 'nav-subitem-active')} onClick={() => router.push(item.path)}>{item.label}</button>)}</div>}</div>
+						}
 						const path = value === 'overview' ? '/' : `/${value}`
 						const active = value === 'overview' ? isOverview : pathname.startsWith(path)
 						const implemented = value === 'overview' || value === 'employees' || value === 'stores' || value === 'quizzes' || value === 'results' || value === 'photos' || value === 'schedules' || value === 'tasks' || value === 'announcements' || value === 'knowledge'

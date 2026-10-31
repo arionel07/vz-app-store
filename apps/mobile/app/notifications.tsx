@@ -10,7 +10,7 @@ import { requestAndRegisterPushDevice } from '../src/notifications/registration'
 import { useAppTheme } from '../src/theme'
 import type { NotificationPreferences, NotificationResponse } from '@vizaje/contracts'
 
-const categoryLabels = { task: 'Задание', quiz: 'Тест', schedule: 'Расписание', photo: 'Фото', announcement: 'Объявление', knowledge: 'База знаний' } as const
+const categoryLabels = { task: 'Задание', quiz: 'Тест', schedule: 'Расписание', photo: 'Фото', announcement: 'Объявление', knowledge: 'База знаний', operations: 'Операции' } as const
 const preferenceLabels: Array<{ key: keyof NotificationPreferences; label: string }> = [
 	{ key: 'pushEnabled', label: 'Push-уведомления' },
 	{ key: 'taskNotifications', label: 'Задания' },
@@ -18,6 +18,7 @@ const preferenceLabels: Array<{ key: keyof NotificationPreferences; label: strin
 	{ key: 'scheduleNotifications', label: 'Расписание' },
 	{ key: 'photoReviewNotifications', label: 'Проверка фотографий' },
 	{ key: 'announcementNotifications', label: 'Объявления' },
+	{ key: 'operationsNotifications', label: 'Операции' },
 ]
 
 function errorText(error: unknown): string { return error instanceof ApiError && error.status === 0 ? 'Нет соединения с сервером.' : 'Не удалось загрузить уведомления.' }

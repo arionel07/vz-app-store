@@ -34,7 +34,7 @@ export const taskPriorityEnum = pgEnum("task_priority", ["low", "normal", "high"
 export const taskStatusEnum = pgEnum("task_status", ["assigned", "in_progress", "submitted", "checked", "rejected"]);
 export const taskSubmissionStatusEnum = pgEnum("task_submission_status", ["submitted", "checked", "rejected"]);
 export const taskRecurrenceFrequencyEnum = pgEnum("task_recurrence_frequency", ["daily", "weekly", "monthly"]);
-export const notificationTargetKindEnum = pgEnum("notification_target_kind", ["task", "photo_report", "quiz", "attempt", "schedule", "announcement", "knowledge"]);
+export const notificationTargetKindEnum = pgEnum("notification_target_kind", ["task", "photo_report", "quiz", "attempt", "schedule", "announcement", "knowledge", "operation"]);
 export const notificationOutboxStatusEnum = pgEnum("notification_outbox_status", ["pending", "claimed", "accepted", "retry", "permanent"]);
 export const pushPlatformEnum = pgEnum("push_platform", ["ios", "android"]);
 export const announcementStatusEnum = pgEnum("announcement_status", ["draft", "published", "archived"]);
@@ -42,6 +42,11 @@ export const knowledgeArticleStatusEnum = pgEnum("knowledge_article_status", ["d
 export const knowledgeRevisionStatusEnum = pgEnum("knowledge_revision_status", ["draft", "published", "archived"]);
 export const knowledgeContentFormatEnum = pgEnum("knowledge_content_format", ["markdown"]);
 export const knowledgeVisibilityKindEnum = pgEnum("knowledge_visibility_kind", ["all", "store", "role"]);
+export const retailCampaignStatusEnum = pgEnum("retail_campaign_status", ["draft", "scheduled", "active", "completed", "archived", "cancelled"]);
+export const retailExecutionStatusEnum = pgEnum("retail_execution_status", ["not_started", "in_progress", "submitted", "checked", "rejected"]);
+export const merchandisingStatusEnum = pgEnum("merchandising_status", ["draft", "submitted", "checked", "rejected"]);
+export const storeIssueStatusEnum = pgEnum("store_issue_status", ["open", "in_progress", "resolved", "closed"]);
+export const operationalRequestStatusEnum = pgEnum("operational_request_status", ["submitted", "approved", "rejected", "in_progress", "completed"]);
 
 export const users = pgTable(
   "users",
@@ -162,6 +167,119 @@ export const photos = pgTable(
     check("photos_mime_type_check", sql`${table.mimeType} in ('image/jpeg', 'image/png', 'image/webp')`),
   ],
 );
+
+export const retailCampaigns = pgTable("retail_campaigns", {
+  id: uuid("id").defaultRandom().primaryKey(), title: text("title").notNull(), description: text("description").notNull().default(""),
+  status: retailCampaignStatusEnum("status").notNull().default("draft"), startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(), timezone: text("timezone").notNull(),
+  requiredActions: jsonb("required_actions").$type<string[]>().notNull().default([]), requiresPhoto: boolean("requires_photo").notNull().default(false),
+  referencePhotoIds: uuid("reference_photo_ids").array().notNull().default([]), createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("retail_campaigns_status_dates_idx").on(table.status, table.startsAt, table.endsAt)]);
+
+export const retailCampaignStores = pgTable("retail_campaign_stores", {
+  campaignId: uuid("campaign_id").notNull().references(() => retailCampaigns.id, { onDelete: "restrict" }),
+  storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "restrict" }),
+}, (table) => [primaryKey({ columns: [table.campaignId, table.storeId] })]);
+
+export const retailCampaignExecutions = pgTable("retail_campaign_executions", {
+  id: uuid("id").defaultRandom().primaryKey(), campaignId: uuid("campaign_id").notNull().references(() => retailCampaigns.id, { onDelete: "restrict" }),
+  storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "restrict" }), status: retailExecutionStatusEnum("status").notNull().default("not_started"),
+  actionResults: jsonb("action_results").$type<boolean[]>().notNull().default([]), evidencePhotoIds: uuid("evidence_photo_ids").array().notNull().default([]),
+  submittedBy: uuid("submitted_by").references(() => users.id, { onDelete: "restrict" }), submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  reviewerId: uuid("reviewer_id").references(() => users.id, { onDelete: "restrict" }), reviewComment: text("review_comment"),
+  version: integer("version").notNull().default(0), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("retail_campaign_executions_campaign_store_unique").on(table.campaignId, table.storeId), index("retail_campaign_executions_store_status_idx").on(table.storeId, table.status, table.updatedAt)]);
+
+export const retailCampaignSubmissions = pgTable("retail_campaign_submissions", {
+  id: uuid("id").defaultRandom().primaryKey(), executionId: uuid("execution_id").notNull().references(() => retailCampaignExecutions.id, { onDelete: "restrict" }),
+  version: integer("version").notNull(), submittedBy: uuid("submitted_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  actionResults: jsonb("action_results").$type<boolean[]>().notNull(), evidencePhotoIds: uuid("evidence_photo_ids").array().notNull().default([]),
+  employeeNote: text("employee_note").notNull().default(""),
+  idempotencyKey: text("idempotency_key").notNull(), submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("retail_campaign_submissions_execution_version_unique").on(table.executionId, table.version), uniqueIndex("retail_campaign_submissions_execution_idempotency_unique").on(table.executionId, table.idempotencyKey), index("retail_campaign_submissions_actor_idx").on(table.submittedBy, table.submittedAt)]);
+
+export const retailCampaignReviews = pgTable("retail_campaign_reviews", {
+  id: uuid("id").defaultRandom().primaryKey(), executionId: uuid("execution_id").notNull().references(() => retailCampaignExecutions.id, { onDelete: "restrict" }),
+  submissionId: uuid("submission_id").references(() => retailCampaignSubmissions.id, { onDelete: "restrict" }),
+  actorId: uuid("actor_id").notNull().references(() => users.id, { onDelete: "restrict" }), fromStatus: retailExecutionStatusEnum("from_status").notNull(),
+  toStatus: retailExecutionStatusEnum("to_status").notNull(), comment: text("comment"), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("retail_campaign_reviews_execution_idx").on(table.executionId, table.createdAt)]);
+
+export const merchandisingDisplays = pgTable("merchandising_displays", {
+  id: uuid("id").defaultRandom().primaryKey(), storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "restrict" }),
+  name: text("name").notNull(), brand: text("brand").notNull().default(""), referencePhotoId: uuid("reference_photo_id").notNull().references(() => photos.id, { onDelete: "restrict" }),
+  checklist: jsonb("checklist").$type<string[]>().notNull().default([]), campaignId: uuid("campaign_id").references(() => retailCampaigns.id, { onDelete: "set null" }),
+  active: boolean("active").notNull().default(true), createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("merchandising_displays_store_active_idx").on(table.storeId, table.active)]);
+
+export const merchandisingInspections = pgTable("merchandising_inspections", {
+  id: uuid("id").defaultRandom().primaryKey(), displayId: uuid("display_id").notNull().references(() => merchandisingDisplays.id, { onDelete: "restrict" }),
+  displayNameSnapshot: text("display_name_snapshot").notNull(), brandSnapshot: text("brand_snapshot").notNull(), checklistSnapshot: jsonb("checklist_snapshot").$type<string[]>().notNull(),
+  referencePhotoId: uuid("reference_photo_id").notNull().references(() => photos.id, { onDelete: "restrict" }),
+  actualPhotoId: uuid("actual_photo_id").references(() => photos.id, { onDelete: "restrict" }), checklistResults: jsonb("checklist_results").$type<boolean[]>().notNull().default([]),
+  status: merchandisingStatusEnum("status").notNull().default("draft"), submittedBy: uuid("submitted_by").references(() => users.id, { onDelete: "restrict" }),
+  reviewerId: uuid("reviewer_id").references(() => users.id, { onDelete: "restrict" }), comment: text("comment"), version: integer("version").notNull().default(1),
+  employeeNote: text("employee_note").notNull().default(""),
+  idempotencyKey: text("idempotency_key"), submittedAt: timestamp("submitted_at", { withTimezone: true }), reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("merchandising_inspections_submit_idempotency_unique").on(table.submittedBy, table.idempotencyKey), uniqueIndex("merchandising_inspections_display_version_unique").on(table.displayId, table.version), index("merchandising_inspections_status_idx").on(table.status, table.submittedAt)]);
+
+export const merchandisingReviewHistory = pgTable("merchandising_review_history", {
+  id: uuid("id").defaultRandom().primaryKey(), inspectionId: uuid("inspection_id").notNull().references(() => merchandisingInspections.id, { onDelete: "restrict" }),
+  actorId: uuid("actor_id").notNull().references(() => users.id, { onDelete: "restrict" }), fromStatus: merchandisingStatusEnum("from_status").notNull(),
+  toStatus: merchandisingStatusEnum("to_status").notNull(), comment: text("comment"), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("merchandising_review_history_inspection_idx").on(table.inspectionId, table.createdAt)]);
+
+export const storeIssues = pgTable("store_issues", {
+  id: uuid("id").defaultRandom().primaryKey(), storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "restrict" }),
+  category: text("category").notNull(), title: text("title").notNull(), description: text("description").notNull(), priority: text("priority").notNull().default("normal"),
+  photoIds: uuid("photo_ids").array().notNull().default([]), reporterId: uuid("reporter_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  createIdempotencyKey: text("create_idempotency_key"), createRequestHash: text("create_request_hash"),
+  assignedTo: uuid("assigned_to").references(() => users.id, { onDelete: "set null" }), status: storeIssueStatusEnum("status").notNull().default("open"),
+  resolutionNotes: text("resolution_notes"), resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("store_issues_store_status_idx").on(table.storeId, table.status, table.priority, table.createdAt), uniqueIndex("store_issues_reporter_idempotency_unique").on(table.reporterId, table.createIdempotencyKey)]);
+
+export const storeIssueHistory = pgTable("store_issue_history", {
+  id: uuid("id").defaultRandom().primaryKey(), issueId: uuid("issue_id").notNull().references(() => storeIssues.id, { onDelete: "restrict" }),
+  actorId: uuid("actor_id").notNull().references(() => users.id, { onDelete: "restrict" }), action: text("action").notNull(),
+  fromStatus: storeIssueStatusEnum("from_status"), toStatus: storeIssueStatusEnum("to_status"), reason: text("reason"),
+  previousPriority: text("previous_priority"), newPriority: text("new_priority"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("store_issue_history_issue_idx").on(table.issueId, table.createdAt)]);
+
+export const operationalRequests = pgTable("operational_requests", {
+  id: uuid("id").defaultRandom().primaryKey(), storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "restrict" }),
+  category: text("category").notNull(), description: text("description").notNull(), quantity: text("quantity"), attachmentPhotoIds: uuid("attachment_photo_ids").array().notNull().default([]),
+  requesterId: uuid("requester_id").notNull().references(() => users.id, { onDelete: "restrict" }), createIdempotencyKey: text("create_idempotency_key"), createRequestHash: text("create_request_hash"), assignedTo: uuid("assigned_to").references(() => users.id, { onDelete: "set null" }),
+  status: operationalRequestStatusEnum("status").notNull().default("submitted"), decisionComment: text("decision_comment"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("operational_requests_store_status_idx").on(table.storeId, table.status, table.createdAt), uniqueIndex("operational_requests_requester_idempotency_unique").on(table.requesterId, table.createIdempotencyKey)]);
+
+export const operationalRequestHistory = pgTable("operational_request_history", {
+  id: uuid("id").defaultRandom().primaryKey(), requestId: uuid("request_id").notNull().references(() => operationalRequests.id, { onDelete: "restrict" }),
+  actorId: uuid("actor_id").notNull().references(() => users.id, { onDelete: "restrict" }), fromStatus: operationalRequestStatusEnum("from_status"),
+  toStatus: operationalRequestStatusEnum("to_status").notNull(), comment: text("comment"), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("operational_request_history_request_idx").on(table.requestId, table.createdAt)]);
+
+export const retailCampaignReferencePhotos = pgTable("retail_campaign_reference_photos", {
+  campaignId: uuid("campaign_id").notNull().references(() => retailCampaigns.id, { onDelete: "restrict" }),
+  photoId: uuid("photo_id").notNull().references(() => photos.id, { onDelete: "restrict" }),
+}, (table) => [primaryKey({ columns: [table.campaignId, table.photoId] })]);
+export const retailCampaignSubmissionPhotos = pgTable("retail_campaign_submission_photos", {
+  submissionId: uuid("submission_id").notNull().references(() => retailCampaignSubmissions.id, { onDelete: "restrict" }),
+  photoId: uuid("photo_id").notNull().references(() => photos.id, { onDelete: "restrict" }),
+}, (table) => [primaryKey({ columns: [table.submissionId, table.photoId] })]);
+export const storeIssuePhotos = pgTable("store_issue_photos", {
+  issueId: uuid("issue_id").notNull().references(() => storeIssues.id, { onDelete: "restrict" }),
+  photoId: uuid("photo_id").notNull().references(() => photos.id, { onDelete: "restrict" }),
+}, (table) => [primaryKey({ columns: [table.issueId, table.photoId] })]);
+export const operationalRequestPhotos = pgTable("operational_request_photos", {
+  requestId: uuid("request_id").notNull().references(() => operationalRequests.id, { onDelete: "restrict" }),
+  photoId: uuid("photo_id").notNull().references(() => photos.id, { onDelete: "restrict" }),
+}, (table) => [primaryKey({ columns: [table.requestId, table.photoId] })]);
 
 export const photoReports = pgTable(
   "photo_reports",
@@ -307,6 +425,7 @@ export const notificationPreferences = pgTable(
     scheduleNotifications: boolean("schedule_notifications").notNull().default(true),
     photoReviewNotifications: boolean("photo_review_notifications").notNull().default(true),
     announcementNotifications: boolean("announcement_notifications").notNull().default(true),
+    operationsNotifications: boolean("operations_notifications").notNull().default(true),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
 );

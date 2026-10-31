@@ -19,6 +19,7 @@ import {
 } from './session-store'
 import type { MobileSessionResponse, StoreResponse, UserResponse } from '@vizaje/contracts'
 import { unregisterCurrentPushDevice } from '../notifications/registration'
+import { clearPrivateMediaCache } from '../photos/private-media-cache'
 
 export type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated' | 'offline' | 'storage-error'
 export type LoginSubmissionStatus = 'idle' | 'submitting'
@@ -136,6 +137,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 	const clearLocalSession = useCallback(async () => {
 		sessionRef.current = null
 		setUser(null)
+		await clearPrivateMediaCache()
 		try {
 			await sessionStore.clear()
 			return true

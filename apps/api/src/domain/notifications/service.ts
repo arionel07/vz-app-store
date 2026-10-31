@@ -19,6 +19,11 @@ import {
   users,
   stores,
   knowledgeVisibilityTargets,
+  operationalRequests,
+  retailCampaignExecutions,
+  merchandisingDisplays,
+  merchandisingInspections,
+  storeIssues,
 } from "../../db/schema";
 import type { Database } from "../../db/client";
 import {
@@ -49,6 +54,7 @@ const defaultPreferences = {
   scheduleNotifications: true,
   photoReviewNotifications: true,
   announcementNotifications: true,
+  operationsNotifications: true,
 };
 
 function dateValue(value: Date | null): string | null {
@@ -62,6 +68,7 @@ function categoryForEvent(eventType: string): NotificationCategory | null {
   if (eventType.startsWith("photo.")) return "photo";
   if (eventType.startsWith("knowledge.")) return "knowledge";
   if (eventType === "announcement.published") return "announcement";
+  if (eventType.startsWith("campaign.") || ["merchandising.submitted","merchandising.checked","merchandising.rejected"].includes(eventType) || eventType.startsWith("store_issue.") || eventType.startsWith("operational_request.")) return "operations";
   return null;
 }
 
@@ -71,6 +78,7 @@ function preferenceEnabled(preferences: typeof defaultPreferences, category: Not
   if (category === "quiz") return preferences.quizNotifications;
   if (category === "schedule") return preferences.scheduleNotifications;
   if (category === "photo") return preferences.photoReviewNotifications;
+  if (category === "operations") return preferences.operationsNotifications;
   return preferences.announcementNotifications;
 }
 
@@ -139,6 +147,7 @@ export class NotificationsService {
       scheduleNotifications: row.scheduleNotifications,
       photoReviewNotifications: row.photoReviewNotifications,
       announcementNotifications: row.announcementNotifications,
+      operationsNotifications: row.operationsNotifications,
     } : defaultPreferences);
   }
 
@@ -276,6 +285,39 @@ export class NotificationsService {
     const payload = asPayload(event.payload);
     const category = categoryForEvent(event.eventType);
     if (!category || event.eventType === "announcement.published") return [];
+    if (category === "operations") {
+      const storeId = payloadId(payload,"storeId");
+      const requestedStoreIds=Array.isArray(payload.storeIds)?payload.storeIds.filter((x):x is string=>typeof x==="string"):storeId?[storeId]:[];
+      if (!requestedStoreIds.length) return [];
+      const activeStores=await tx.select({id:stores.id}).from(stores).where(and(inArray(stores.id,requestedStoreIds),eq(stores.isActive,true)));
+      const activeStoreIds=distinct(activeStores.map((row:{id:string})=>row.id));
+      if (!activeStoreIds.length) return [];
+      const operationStoreId=storeId&&activeStoreIds.includes(storeId)?storeId:activeStoreIds[0]!;
+      const management = ["campaign.execution_submitted","merchandising.submitted","store_issue.created","operational_request.submitted"].includes(event.eventType);
+      let recipients: string[] = [];
+      let targetId = event.aggregateId;
+      let title = "Обновление по операциям магазина";
+      let body = "Откройте раздел операций, чтобы посмотреть подробности.";
+      if (management) recipients = await this.resolveRecipients(tx,activeStoreIds,["admin","manager"]);
+      else if (["campaign.published","campaign.completed","campaign.cancelled"].includes(event.eventType)) { recipients = await this.resolveRecipients(tx,activeStoreIds,["staff"]); title=event.eventType==="campaign.published"?"Новая кампания":"Статус кампании изменён"; body=event.eventType==="campaign.published"?"В вашем магазине доступна кампания.":"Статус кампании обновлён."; }
+      else if (["store_issue.assigned","operational_request.assigned"].includes(event.eventType)) { const assigned=payloadId(payload,"assignedTo");if(assigned){const [membership]=await tx.select({userId:userStores.userId}).from(userStores).innerJoin(users,eq(users.id,userStores.userId)).innerJoin(stores,eq(stores.id,userStores.storeId)).where(and(eq(userStores.userId,assigned),eq(userStores.storeId,operationStoreId),eq(users.isActive,true),eq(stores.isActive,true))).limit(1);if(membership)recipients=[assigned];} title="Назначена операция"; body="Вам назначена запись магазина."; }
+      else {
+        const execution = event.eventType.startsWith("campaign.execution_");
+        const inspection = event.eventType.startsWith("merchandising.");
+        const issue = event.eventType.startsWith("store_issue.");
+        let record:{ownerId:string|null;storeId:string}|undefined;
+        if(execution){const [row]=await tx.select({ownerId:retailCampaignExecutions.submittedBy,storeId:retailCampaignExecutions.storeId}).from(retailCampaignExecutions).where(eq(retailCampaignExecutions.id,event.aggregateId)).limit(1);record=row;}
+        else if(inspection){const [row]=await tx.select({ownerId:merchandisingInspections.submittedBy,storeId:merchandisingDisplays.storeId}).from(merchandisingInspections).innerJoin(merchandisingDisplays,eq(merchandisingDisplays.id,merchandisingInspections.displayId)).where(eq(merchandisingInspections.id,event.aggregateId)).limit(1);record=row;}
+        else if(issue){const [row]=await tx.select({ownerId:storeIssues.reporterId,storeId:storeIssues.storeId}).from(storeIssues).where(eq(storeIssues.id,event.aggregateId)).limit(1);record=row;}
+        else{const [row]=await tx.select({ownerId:operationalRequests.requesterId,storeId:operationalRequests.storeId}).from(operationalRequests).where(eq(operationalRequests.id,event.aggregateId)).limit(1);record=row;}
+        if (record?.ownerId&&record.storeId) {const [membership]=await tx.select({userId:userStores.userId}).from(userStores).innerJoin(users,eq(users.id,userStores.userId)).innerJoin(stores,eq(stores.id,userStores.storeId)).where(and(eq(userStores.userId,record.ownerId),eq(userStores.storeId,record.storeId),eq(users.isActive,true),eq(stores.isActive,true))).limit(1);if(membership)recipients=[record.ownerId];}
+        if (event.eventType.endsWith("rejected")) { title="Нужны исправления"; body="Операцию вернули на доработку. Посмотрите комментарий в приложении."; }
+        else if (event.eventType.endsWith("checked")) { title="Проверка завершена"; body="Результат проверки доступен в приложении."; }
+        else if (event.eventType.includes("approved")) { title="Заявка одобрена"; body="Можно посмотреть детали и статус выполнения."; }
+        else if (event.eventType.includes("resolved") || event.eventType.includes("completed")) { title="Операция завершена"; body="Статус вашей записи обновлён."; }
+      }
+      return distinct(recipients).map(recipientId=>({recipientId,sourceEventId:event.id,eventType:event.eventType,category,title,body,target:target("operation",targetId),requiresAcknowledgement:false}));
+    }
     if (event.eventType === "knowledge.published") {
       const articleId = payloadId(payload, "articleId");
       if (!articleId) return [];
