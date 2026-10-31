@@ -8,6 +8,8 @@ import {
   errorResponseSchema,
   photoResponseSchema,
   quizStaffResponseSchema,
+  reportDrilldownReferenceSchema,
+  reportTimeSeriesResponseSchema,
 } from "@vizaje/contracts";
 
 const userId = "00000000-0000-0000-0000-000000000001";
@@ -18,6 +20,8 @@ const questionId = "00000000-0000-0000-0000-000000000005";
 const optionId = "00000000-0000-0000-0000-000000000006";
 
 test("shared contracts are client-safe and parse representative API payloads", () => {
+  expect(reportDrilldownReferenceSchema.parse({ kind: "employee", id: userId })).toEqual({ kind: "employee", id: userId });
+  expect(reportTimeSeriesResponseSchema.shape.interval.safeParse("day").success).toBe(true);
   expect(dashboardFiltersSchema.parse({ startDate: "2026-01-01T00:00:00Z", endDate: "2026-01-02T00:00:00Z" })).toMatchObject({
     startDate: "2026-01-01T00:00:00Z",
     endDate: "2026-01-02T00:00:00Z",

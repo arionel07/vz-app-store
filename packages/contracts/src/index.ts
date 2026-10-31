@@ -12,3 +12,4 @@ export * from "./tasks";
 export * from "./notifications";
 export * from "./knowledge";
 export * from "./operations";
+export * from "./reporting";

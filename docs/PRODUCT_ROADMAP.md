@@ -1,9 +1,9 @@
 # Vizaje Staff — Architecture Review and Product Roadmap
 
-Status: planning document only
-Reviewed branch: `upgrade/mobile-expo-sdk-58`
-Reviewed commit: `df003ea7a82e11987cd628606a2ee42f4ff519fd`
-Scope: architecture inventory and milestones 12–20; no product feature implementation
+Status: living roadmap; M20.1–M20.3 reporting implementation and acceptance validated in the working tree on 2026-10-31
+Branch: `upgrade/mobile-expo-sdk-58`
+M20.1 base commit: `2c6b7a0550e9f639fcdb5cad44c487ae34e37062`
+Scope: architecture inventory and milestones 12–20; M20 reporting is accepted but not deployed
 
 ## 1. Executive summary
 
@@ -144,8 +144,8 @@ Notification integration tests cover recipient scope, inbox dedupe, push deliver
 | Tasks/checklists | Implemented | Milestone 16; scoped templates, occurrences, checklists, private evidence, review history, Admin and Mobile clients |
 | In-app/push notifications and announcements | Implemented in Milestone 17 | Milestone 18+ extensions |
 | Knowledge base | Implemented in Milestone 18 | Milestone 19+ extensions |
-| Retail operations | M19.1 Backend, M19.2 Admin, and M19.3 Mobile are implemented in the current working tree | M19.4 final integration, regression and release acceptance |
-| Advanced reporting | Not implemented | Milestone 20 |
+| Retail operations | M19.1–M19.4 implemented and functionally accepted | Physical-device validation and production readiness remain release gates |
+| Advanced reporting | M20.1 backend, M20.2 Admin, and M20.3 functional acceptance passed in the current working tree | Production deployment, production-scale performance validation, and operational monitoring remain release gates |
 
 ## 4. Proposed module boundaries
 
@@ -560,10 +560,12 @@ deployment, push-provider configuration, and monitoring remain release work.
 
 Dependencies: stable event/status history, review outcomes, schedules/tasks/notifications, and agreed metric definitions.
 
-- **Backend:** Add scoped aggregate queries/read models for employee, store, quiz, photo, schedule, task, and campaign metrics; define UTC/local-time reporting rules.
-- **Admin:** Add filters, drill-downs, exports only where approved, and role-scoped comparisons; preserve current dashboard semantics until replacements are validated.
+- **M20.1 Backend foundation:** `docs/reporting-metrics.md`, shared Zod contracts, explicit management reporting endpoints, scoped aggregate services and PostgreSQL reconciliation/performance validation. Current-state snapshots are distinguished from period events; the existing dashboard remains unchanged.
+- **M20.2 Admin (accepted):** A single Аналитика section, eight scoped views, ten explicit BFF endpoints, URL-backed filters, accessible chart tables, loading/empty/error states, and manager-scoped store options are implemented. The previous dashboard route and KPI semantics are unchanged.
+- **M20.3 final acceptance (passed 2026-10-31):** Deterministic PostgreSQL source reconciliation, API/BFF HTTP scenarios, role/scope checks, timezone boundaries, two full 85-test PostgreSQL/API runs, Chromium acceptance of all eight views in Light/Dark and desktop/tablet layouts, keyboard/filter/pagination checks, and synthetic query-plan measurement passed. See `docs/reporting-metrics.md` and `apps/admin/README.md` for evidence and limitations.
+- **Production/release gates:** No deployment was performed. Re-measure at production cardinality and concurrency, validate environment-specific auth/HTTPS/cache configuration, and wire operational dashboards/alerts before production use. Do not add analytics infrastructure absent measured need.
 - **Mobile:** Keep mobile reporting minimal and limited to personal progress/status unless a separate product decision approves more.
-- **Shared contracts:** Add metric definitions, periods, dimensions, pagination, and export job contracts if needed.
+- **Shared contracts:** M20.1 adds metric definitions, periods, scoped store/employee filters, explicit aggregate responses, and pagination; any export-job contracts remain future work if approved.
 - **Database migrations:** Add indexes/materialized/read-model tables only after measured query plans justify them.
 - **Automated tests:** Metric definitions, date boundaries, duplicate memberships/assignments, scope, historical revisions, null/empty behavior, and performance budgets.
 - **Acceptance criteria:** Every metric has a written definition and scope; reports reconcile with source records; unauthorized comparisons are impossible; expensive aggregation is measured before introducing a separate analytics system.
@@ -632,4 +634,4 @@ These questions should be answered before implementation of the corresponding mi
 
 The current repository is not missing a backend foundation; it has a working identity/store/authentication layer, private photo storage, revisioned quizzes, results, dashboard aggregates, and explicit Admin/Mobile clients. The future work is additive domain expansion.
 
-Milestones 12–18 address employee profiles, photo review, the advanced revisioned quiz engine, work schedules, retail tasks/checklists, notifications/announcements, and the scoped knowledge base. Retail operations M19.1–M19.4 are implemented and functionally accepted. Physical-device validation and production readiness remain explicit release gates. Advanced reporting remains M20 and is outside the scope of the completed work.
+Milestones 12–18 address employee profiles, photo review, the advanced revisioned quiz engine, work schedules, retail tasks/checklists, notifications/announcements, and the scoped knowledge base. Retail operations M19.1–M19.4 and reporting M20.1–M20.3 are implemented and functionally accepted on `upgrade/mobile-expo-sdk-58`. Reporting acceptance was local and did not deploy the application. Production-scale load, environment-specific release configuration, monitoring, and mobile physical-device verification remain explicit release gates.

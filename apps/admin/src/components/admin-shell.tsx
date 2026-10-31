@@ -35,6 +35,7 @@ import { useSessionUser } from '@/components/session-provider'
 
 const navItems = [
 	{ label: 'Обзор', icon: LayoutGrid, value: 'overview' },
+	{ label: 'Аналитика', icon: BarChart3, value: 'analytics' },
 	{ label: 'Сотрудники', icon: UsersRound, value: 'employees' },
 	{ label: 'Магазины', icon: Store, value: 'stores' },
 	{ label: 'Тесты', icon: ClipboardList, value: 'quizzes' },
@@ -136,7 +137,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 						}
 						const path = value === 'overview' ? '/' : `/${value}`
 						const active = value === 'overview' ? isOverview : pathname.startsWith(path)
-						const implemented = value === 'overview' || value === 'employees' || value === 'stores' || value === 'quizzes' || value === 'results' || value === 'photos' || value === 'schedules' || value === 'tasks' || value === 'announcements' || value === 'knowledge'
+						const implemented = value === 'overview' || value === 'analytics' || value === 'employees' || value === 'stores' || value === 'quizzes' || value === 'results' || value === 'photos' || value === 'schedules' || value === 'tasks' || value === 'announcements' || value === 'knowledge'
 						return <button key={value} type="button" className={cn('nav-item', active && 'nav-item-active')} onClick={() => {
 							if (implemented) router.push(path)
 							else toast.info(`${label}: раздел будет доступен позже`)

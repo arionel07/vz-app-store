@@ -184,6 +184,14 @@ The dashboard endpoints require an authenticated active administrator or manager
 
 Dashboard SQL uses PostgreSQL aggregation and correlated `EXISTS` predicates for store scope. This prevents duplicate counts for users assigned to multiple stores or quizzes assigned to multiple stores. Inactive users, inactive stores, and records outside the active scope are excluded from activity metrics.
 
+## Reporting API (M20.1 foundation)
+
+M20.1 adds read-only reporting endpoints under `/api/v1/management/reports`: `overview`, `time-series`, `stores`, `employees`, `training`, `photos`, `tasks`, `schedules`, `operations`, and `metric-definitions`. They require an active administrator or manager; manager store scope is resolved from current active memberships on the server. Staff cannot access these endpoints. Employee drilldown omits contact and HR profile fields. The daily time series uses local calendar dates and only period events, not current-state snapshots.
+
+Period parameters are `period=today|last_7_days|last_30_days|current_month|previous_month|custom`, optional IANA `timezone` (default `Europe/Chisinau`), and for custom periods inclusive `startDate`/`endDate` (`YYYY-MM-DD`). Custom ranges are capped at 366 calendar days. Responses expose UTC half-open event boundaries and `snapshotAt`. Event metrics use the selected period; current status metrics remain current-state snapshots even when a historical period is selected. The old dashboard API and KPI definitions are unchanged. See [`docs/reporting-metrics.md`](docs/reporting-metrics.md) for definitions, source grains, limitations, compatibility and performance evidence.
+
+M20.3 acceptance passed locally on 2026-10-31: metric/source reconciliation and the full PostgreSQL/API suite passed twice (86 tests and 702 assertions per run), all ten authenticated Admin BFF routes were exercised over HTTP, and Chromium acceptance covered all eight Admin reporting views. No production deployment was performed. The synthetic query measurements are not production SLOs; production-scale load, environment configuration, and monitoring remain release prerequisites.
+
 ## Architecture notes
 
 - `apps/api/src/app.ts` builds a dependency-injected Hono app, keeping HTTP behavior testable without a live database.

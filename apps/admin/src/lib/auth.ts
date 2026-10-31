@@ -32,6 +32,7 @@ const MANAGEMENT_API_PREFIXES = [
 	'/api/v1/management/announcements',
 	'/api/v1/management/knowledge',
 	'/api/v1/management/operations',
+	'/api/v1/management/reports',
 	'/api/v1/operations',
 	'/api/v1/task-evidence',
 ]

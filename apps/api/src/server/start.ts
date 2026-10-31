@@ -17,6 +17,7 @@ import { createShutdownHandler } from "./shutdown";
 import { createNotificationsService } from "../domain/notifications/service";
 import { createKnowledgeService } from "../domain/knowledge/service";
 import { OperationsService } from "../domain/operations/service";
+import { createReportsService } from "../domain/reports/service";
 
 export function startServer() {
   const env = loadEnv();
@@ -88,6 +89,10 @@ export function startServer() {
     },
     operationsRoutes: {
       operations: new OperationsService(db, photoStorage),
+      resolvePrincipal: auth.principalResolver(),
+    },
+    reportsRoutes: {
+      reports: createReportsService(db),
       resolvePrincipal: auth.principalResolver(),
     },
     logger,
