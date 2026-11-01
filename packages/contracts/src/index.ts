@@ -8,6 +8,7 @@ export * from "./users";
 export * from "./dashboard";
 export * from "./employee-profiles";
 export * from "./schedules";
+export * from "./schedule-dates";
 export * from "./tasks";
 export * from "./notifications";
 export * from "./knowledge";
