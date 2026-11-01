@@ -59,6 +59,11 @@ suite("Work schedules PostgreSQL integration", () => {
     await schedulesService.addShift(manager, periodId, { employeeId: staffId, localDate: "2026-03-28", startTime: "22:00", endTime: "06:00", note: "Закрытие" });
     await expect(schedulesService.addShift(manager, periodId, { employeeId: staffId, localDate: "2026-03-29", startTime: "05:00", endTime: "07:00", note: null })).rejects.toMatchObject({ status: 409, code: "SHIFT_OVERLAP" });
     await expect(schedulesService.addDayOff(manager, periodId, { employeeId: staffId, localDate: "2026-03-28", note: null })).rejects.toMatchObject({ status: 409, code: "DAY_OFF_SHIFT_CONFLICT" });
+    const removable = await schedulesService.addShift(manager, periodId, { employeeId: staffId, localDate: "2026-03-30", startTime: "10:00", endTime: "14:00", note: "Удаляемая смена" });
+    const removableShiftId = removable.shifts.find((shift) => shift.localDate === "2026-03-30")!.id;
+    const afterRemoval = await schedulesService.removeShift(manager, periodId, removableShiftId);
+    expect(afterRemoval.shifts.some((shift) => shift.id === removableShiftId)).toBe(false);
+    expect((await schedulesService.history(manager, periodId)).data.some((item) => String(item.action) === "shift_removed")).toBe(true);
     const published = await schedulesService.publish(manager, periodId);
     expect(published.status).toBe("published");
     expect((await schedulesService.history(manager, periodId)).data.map((item) => String(item.action))).toContain("published");
