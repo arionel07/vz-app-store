@@ -4,21 +4,13 @@ import { Camera, ChevronLeft, Eye, EyeOff, Leaf, LockKeyhole, Mail, ScanQrCode }
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View, type TextInputInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ApiError, isNetworkError } from '../src/api/client'
-import { createActivationLinkGate, isActivationUrlCandidate, parseActivationPayload, type ActivationPayload } from '../src/auth/activation-payload'
+import { createActivationLinkGate, parseActivationPayload, type ActivationPayload } from '../src/auth/activation-payload'
+import { activationError } from '../src/auth/activation-errors'
+import { resolveActivationUrl } from '../src/auth/activation-link'
 import { useAuth } from '../src/auth/auth-context'
 import { mobileLoginErrorMessage } from '../src/auth/login-errors'
 import { ActionButton, Card, Screen } from '../src/components/ui'
 import { useAppTheme, type ThemeColors } from '../src/theme'
-
-function activationError(error: unknown): string {
-	if (error instanceof ApiError) {
-		if (error.code === 'INVALID_ACTIVATION' || error.status === 401) return 'Код недействителен, уже использован или срок его действия истёк.'
-		if (error.code === 'RATE_LIMITED' || error.status === 429) return 'Слишком много попыток. Получите новый код и повторите позже.'
-		if (isNetworkError(error)) return 'Не удалось связаться с сервером. Проверьте подключение и повторите попытку.'
-	}
-	return 'Не удалось активировать приложение. Повторите попытку или запросите новый QR-код.'
-}
 
 export default function ActivationScreen() {
 	const { colors } = useAppTheme()
@@ -63,12 +55,15 @@ export default function ActivationScreen() {
 	useEffect(() => {
 		if (!url || url === lastUrl.current) return
 		lastUrl.current = url
-		if (!isActivationUrlCandidate(url, activationLinkBaseUrl)) return
-		const payload = parseActivationPayload(url, activationLinkBaseUrl)
-		if (!payload) {
-			setMessage('Ссылка активации недействительна или больше не поддерживается.')
+		const resolution = resolveActivationUrl(url, activationLinkBaseUrl)
+		if (resolution.kind === 'unrelated') return
+		if (resolution.kind === 'malformed') {
+			setPendingLink(null)
+			setShowLogin(false)
+			setMessage('Ссылка активации повреждена или не поддерживается. Попросите новый QR-код или ссылку.')
 			return
 		}
+		const payload = resolution.payload
 		if (!linkGate.current(payload)) return
 		setShowLogin(false)
 		setMessage(null)
