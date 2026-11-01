@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications'
 import * as SecureStore from 'expo-secure-store'
 import { Platform } from 'react-native'
 import { registerPushDevice, removePushDevice } from '../api/client'
+import { supportsNativeNotifications } from './notification-runtime'
 
 const DEVICE_ID_KEY = 'vizaje.notifications.device-id'
 
@@ -18,6 +19,8 @@ async function getDeviceId(): Promise<string> {
 }
 
 export async function requestAndRegisterPushDevice(token: string): Promise<PushRegistrationResult> {
+	if (!supportsNativeNotifications(Platform.OS)) return 'unavailable'
+
 	const permission = await Notifications.getPermissionsAsync()
 	const nextPermission = permission.granted ? permission : await Notifications.requestPermissionsAsync()
 	if (!nextPermission.granted) return 'denied'
@@ -34,6 +37,8 @@ export async function requestAndRegisterPushDevice(token: string): Promise<PushR
 }
 
 export async function unregisterCurrentPushDevice(token: string): Promise<void> {
+	if (!supportsNativeNotifications(Platform.OS)) return
+
 	const deviceId = await SecureStore.getItemAsync(DEVICE_ID_KEY)
 	if (deviceId) await removePushDevice(token, deviceId)
 }
