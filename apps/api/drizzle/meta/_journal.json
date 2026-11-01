@@ -141,6 +141,13 @@
       "when": 1793425190000,
       "tag": "0019_operation_employee_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793425200000,
+      "tag": "0020_knowledge_video_attachments",
+      "breakpoints": true
     }
   ]
 }

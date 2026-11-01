@@ -26,7 +26,7 @@ export const knowledgeVisibilityTargetSchema = z.discriminatedUnion("kind", [
 ]);
 
 export const knowledgeAttachmentResponseSchema = z.object({
-  id: z.string().uuid(), originalFilename: z.string(), mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]), fileSize: z.number().int().positive(), createdAt: z.string().datetime(),
+  id: z.string().uuid(), originalFilename: z.string(), mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp", "video/mp4"]), fileSize: z.number().int().positive(), createdAt: z.string().datetime(),
 });
 
 export const knowledgeQuizLinkSchema = z.object({ id: z.string().uuid(), title: z.string() });

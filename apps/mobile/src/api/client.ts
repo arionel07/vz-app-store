@@ -84,6 +84,7 @@ import {
 	type RequestCreate,
 	type RequestResponse,
 } from '@vizaje/contracts'
+import { knowledgeAttachmentExtension } from '../knowledge/attachments'
 
 const REQUEST_TIMEOUT_MS = 10_000
 
@@ -491,7 +492,7 @@ export async function downloadTaskEvidence(token: string, evidence: Pick<TaskRes
 export async function downloadKnowledgeAttachment(token: string, articleId: string, attachment: Pick<KnowledgeAttachmentResponse, 'id' | 'mimeType'>): Promise<string> {
 	const FileSystem = await import('expo-file-system/legacy')
 	if (!FileSystem.cacheDirectory) throw new ApiError(0, 'CACHE_UNAVAILABLE', 'Временное хранилище недоступно')
-	const extension = attachment.mimeType === 'application/pdf' ? 'pdf' : attachment.mimeType === 'image/png' ? 'png' : attachment.mimeType === 'image/webp' ? 'webp' : 'jpg'
+	const extension = knowledgeAttachmentExtension(attachment.mimeType)
 	const target = `${FileSystem.cacheDirectory}vizaje-knowledge-${encodeURIComponent(attachment.id)}.${extension}`
 	try {
 		const result = await FileSystem.downloadAsync(`${apiOrigin()}/api/v1/me/knowledge/articles/${encodeURIComponent(articleId)}/attachments/${encodeURIComponent(attachment.id)}`, target, { headers: { Authorization: `Bearer ${token}`, Accept: attachment.mimeType } })

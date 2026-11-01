@@ -1173,7 +1173,7 @@ export const knowledgeAttachments = pgTable(
     uploadedBy: uuid("uploaded_by").notNull().references(() => users.id, { onDelete: "restrict" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex("knowledge_attachments_storage_key_unique").on(table.storageKey), index("knowledge_attachments_revision_idx").on(table.revisionId, table.createdAt), check("knowledge_attachments_size_check", sql`${table.fileSize} > 0 and ${table.fileSize} <= 10485760`), check("knowledge_attachments_mime_check", sql`${table.mimeType} in ('application/pdf', 'image/jpeg', 'image/png', 'image/webp')`)],
+  (table) => [uniqueIndex("knowledge_attachments_storage_key_unique").on(table.storageKey), index("knowledge_attachments_revision_idx").on(table.revisionId, table.createdAt), check("knowledge_attachments_size_check", sql`${table.fileSize} > 0 and ${table.fileSize} <= 10485760`), check("knowledge_attachments_mime_check", sql`${table.mimeType} in ('application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'video/mp4')`)],
 );
 
 export const knowledgeArticleQuizLinks = pgTable(

@@ -7,6 +7,7 @@ import { POST as setPassword } from '../src/app/api/admin/employees/[id]/passwor
 import { GET as getEmployeeProfile, PATCH as updateEmployeeProfile } from '../src/app/api/admin/employees/[id]/profile/route'
 import { POST as createAnnouncement } from '../src/app/api/admin/announcements/route'
 import { GET as getKnowledgeCategories } from '../src/app/api/admin/knowledge/categories/route'
+import { GET as getKnowledgeAttachment } from '../src/app/api/admin/knowledge/articles/[id]/attachments/[attachmentId]/route'
 
 const originalFetch = globalThis.fetch
 const apiUrl = 'http://127.0.0.1:3000'
@@ -223,5 +224,24 @@ describe('management BFF', () => {
 		expect(target).toContain('/api/v1/management/knowledge/categories')
 		expect(new Headers(captured?.headers).get('cookie')).toBe('vizaje_session=session')
 		expect(response.headers.get('cache-control')).toContain('no-store')
+	})
+
+	test('streams knowledge MP4 only through the authenticated no-store BFF route', async () => {
+		process.env.VIZAJE_API_URL = apiUrl
+		let target = ''
+		let captured: RequestInit | undefined
+		globalThis.fetch = (async (input, init) => {
+			target = String(input)
+			captured = init
+			return new Response(new Uint8Array([0, 1, 2]), { status: 200, headers: { 'content-type': 'video/mp4', 'cache-control': 'private, no-store', 'content-disposition': "inline; filename*=UTF-8''lesson.mp4" } })
+		}) as typeof fetch
+		const articleId = '00000000-0000-4000-8000-000000000005'
+		const attachmentId = '00000000-0000-4000-8000-000000000006'
+		const response = await getKnowledgeAttachment(request(`/api/admin/knowledge/articles/${articleId}/attachments/${attachmentId}`, { headers: { cookie: 'vizaje_session=session; tracking=secret' } }), { params: Promise.resolve({ id: articleId, attachmentId }) })
+		expect(response.status).toBe(200)
+		expect(response.headers.get('content-type')).toContain('video/mp4')
+		expect(response.headers.get('cache-control')).toContain('no-store')
+		expect(new Headers(captured?.headers).get('cookie')).toBe('vizaje_session=session')
+		expect(target).toContain(`/api/v1/management/knowledge/articles/${articleId}/attachments/${attachmentId}`)
 	})
 })

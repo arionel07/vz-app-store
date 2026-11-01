@@ -3,7 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { loadEnv } from "../src/config/env";
 import { createDatabase } from "../src/db/client";
-import { knowledgeAcknowledgments, knowledgeArticleRevisions, knowledgeArticles, knowledgeCategories, knowledgeVisibilityTargets, domainEvents, notificationEventConsumptions, notificationOutbox, notifications, stores, userStores, users } from "../src/db/schema";
+import { knowledgeAcknowledgments, knowledgeArticleRevisions, knowledgeArticles, knowledgeAttachments, knowledgeCategories, knowledgeVisibilityTargets, domainEvents, notificationEventConsumptions, notificationOutbox, notifications, stores, userStores, users } from "../src/db/schema";
 import type { TrustedPrincipal } from "../src/domain/authz";
 import { createKnowledgeService } from "../src/domain/knowledge/service";
 import { createNotificationsService } from "../src/domain/notifications/service";
@@ -14,7 +14,8 @@ const suite = Bun.env.RUN_INTEGRATION_TESTS === "1" ? describe : describe.skip;
 suite("Knowledge base PostgreSQL integration", () => {
   const { db, client } = createDatabase(loadEnv());
   const suffix = crypto.randomUUID().slice(0, 8);
-  const knowledge = createKnowledgeService(db, new LocalPhotoStorage(`/tmp/vizaje-knowledge-tests-${suffix}`), { maxBytes: 10 * 1024 * 1024, maxDimension: 8192, maxPixels: 25_000_000 });
+  const storage = new LocalPhotoStorage(`/tmp/vizaje-knowledge-tests-${suffix}`);
+  const knowledge = createKnowledgeService(db, storage, { maxBytes: 10 * 1024 * 1024, maxDimension: 8192, maxPixels: 25_000_000 });
   const notificationsService = createNotificationsService(db);
   let adminId = "";
   let managerId = "";
@@ -47,6 +48,8 @@ suite("Knowledge base PostgreSQL integration", () => {
   afterAll(async () => {
     if (articleId) {
       const revisionIds = (await db.select({ id: knowledgeArticleRevisions.id }).from(knowledgeArticleRevisions).where(eq(knowledgeArticleRevisions.articleId, articleId))).map((row) => row.id);
+      const attachments = revisionIds.length ? await db.select({ storageKey: knowledgeAttachments.storageKey }).from(knowledgeAttachments).where(inArray(knowledgeAttachments.revisionId, revisionIds)) : [];
+      await Promise.all(attachments.map((attachment) => storage.delete(attachment.storageKey)));
       await db.delete(knowledgeAcknowledgments).where(eq(knowledgeAcknowledgments.articleId, articleId));
       const eventRows = await db.select({ id: domainEvents.id }).from(domainEvents).where(and(eq(domainEvents.aggregateType, "knowledge_article"), eq(domainEvents.aggregateId, articleId)));
       for (const event of eventRows) {
@@ -78,6 +81,13 @@ suite("Knowledge base PostgreSQL integration", () => {
       quizIds: [],
     });
     articleId = draft.id;
+    const mp4 = new Uint8Array(24);
+    new DataView(mp4.buffer).setUint32(0, mp4.byteLength);
+    mp4.set(new TextEncoder().encode("ftypisom"), 4);
+    mp4.set(new TextEncoder().encode("isommp42"), 16);
+    const video = await knowledge.uploadAttachment(manager(), articleId, new File([mp4], "training.mp4", { type: "video/mp4" }));
+    expect(video).toMatchObject({ mimeType: "video/mp4", originalFilename: "training.mp4" });
+    expect((await knowledge.getManagement(manager(), articleId)).draft?.attachments).toContainEqual(expect.objectContaining({ id: video.id, mimeType: "video/mp4" }));
     expect(draft.status).toBe("draft");
     expect((await knowledge.listStaff(staff(), { page: 1, pageSize: 20 })).pagination.total).toBe(0);
     await expect(knowledge.getManagement(manager(), articleId)).resolves.toMatchObject({ id: articleId });
@@ -96,6 +106,12 @@ suite("Knowledge base PostgreSQL integration", () => {
     expect(staffResponse.status).toBe(200);
     const staffArticle = await app.request(`http://localhost/api/v1/me/knowledge/articles/${articleId}`, { headers: { "x-test-role": "staff" } });
     expect(staffArticle.status).toBe(200);
+    const videoResponse = await app.request(`http://localhost/api/v1/me/knowledge/articles/${articleId}/attachments/${video.id}`, { headers: { "x-test-role": "staff" } });
+    expect(videoResponse.status).toBe(200);
+    expect(videoResponse.headers.get("content-type")).toBe("video/mp4");
+    expect(videoResponse.headers.get("cache-control")).toBe("private, no-store");
+    expect(new Uint8Array(await videoResponse.arrayBuffer())).toEqual(mp4);
+    await expect(knowledge.getAttachment(otherStaff(), articleId, video.id)).rejects.toMatchObject({ status: 404 });
     const denied = await app.request(`http://localhost/api/v1/me/knowledge/articles/${articleId}`, { headers: { "x-test-role": "manager" } });
     expect(denied.status).toBe(403);
     const acknowledgement = await knowledge.acknowledge(staff(), articleId);

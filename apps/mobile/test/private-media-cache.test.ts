@@ -3,7 +3,7 @@ import { clearPrivateMediaCache, deletePrivateMediaCacheFile, didStoreContextCha
 
 describe('private media cache cleanup', () => {
 	test('recognizes only app-owned private image cache files', () => {
-		for (const filename of ['vizaje-photo-1.jpg', 'vizaje-operation-1.png', 'vizaje-task-evidence-2.webp', 'vizaje-knowledge-3.pdf']) {
+		for (const filename of ['vizaje-photo-1.jpg', 'vizaje-operation-1.png', 'vizaje-task-evidence-2.webp', 'vizaje-knowledge-3.pdf', 'vizaje-knowledge-4.mp4']) {
 			expect(isPrivateMediaCacheFile(filename)).toBe(true)
 		}
 		expect(isPrivateMediaCacheFile('expo-image-cache/item')).toBe(false)
@@ -21,10 +21,10 @@ describe('private media cache cleanup', () => {
 		const deleted: string[] = []
 		await clearPrivateMediaCache({
 			cacheDirectory: 'file:///cache/',
-			readDirectoryAsync: async () => ['vizaje-photo-1.jpg', 'vizaje-operation-2.png', 'unrelated.jpg'],
+			readDirectoryAsync: async () => ['vizaje-photo-1.jpg', 'vizaje-operation-2.png', 'vizaje-knowledge-4.mp4', 'unrelated.jpg'],
 			deleteAsync: async (uri) => { deleted.push(uri) },
 		})
-		expect(deleted.sort()).toEqual(['file:///cache/vizaje-operation-2.png', 'file:///cache/vizaje-photo-1.jpg'])
+		expect(deleted.sort()).toEqual(['file:///cache/vizaje-knowledge-4.mp4', 'file:///cache/vizaje-operation-2.png', 'file:///cache/vizaje-photo-1.jpg'])
 	})
 
 	test('deletes a stale private image after a store switch without touching unrelated cache files', async () => {

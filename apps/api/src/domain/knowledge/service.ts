@@ -262,7 +262,7 @@ export class KnowledgeService {
   }
 
   private categoryDto(row: typeof knowledgeCategories.$inferSelect) { return { id: row.id, name: row.name, slug: row.slug, description: row.description, parentId: row.parentId, sortOrder: row.sortOrder, isActive: row.isActive, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() }; }
-  private attachmentDto(row: typeof knowledgeAttachments.$inferSelect) { return { id: row.id, originalFilename: row.originalFilename, mimeType: row.mimeType as "application/pdf" | "image/jpeg" | "image/png" | "image/webp", fileSize: row.fileSize, createdAt: row.createdAt.toISOString() }; }
+  private attachmentDto(row: typeof knowledgeAttachments.$inferSelect) { return { id: row.id, originalFilename: row.originalFilename, mimeType: row.mimeType as "application/pdf" | "image/jpeg" | "image/png" | "image/webp" | "video/mp4", fileSize: row.fileSize, createdAt: row.createdAt.toISOString() }; }
   private staffSummary(row: any) { return { id: row.article.id, category: this.categoryDto(row.category), title: row.revision.title, summary: row.revision.summary, requiresAcknowledgement: row.article.requiresAcknowledgement, acknowledgedAt: row.acknowledgedAt?.toISOString() ?? null, publishedAt: row.revision.publishedAt?.toISOString() ?? row.article.publishedAt?.toISOString(), updatedAt: row.article.updatedAt.toISOString() }; }
 
   private async articleDto(article: typeof knowledgeArticles.$inferSelect) {
