@@ -109,7 +109,7 @@ export default function ProfileScreen() {
 	return <Screen contentStyle={styles.content}>
 		<View style={styles.topBar}>
 			<Leaf accessibilityLabel="Vizaje" color={colors.text} size={44} strokeWidth={2.2} />
-			<Pressable accessibilityRole="button" accessibilityLabel="Открыть уведомления" onPress={() => router.push('/notifications')} style={({ pressed }) => [styles.bellButton, { backgroundColor: colors.surfaceRaised, opacity: pressed ? 0.72 : 1 }]}>
+			<Pressable accessibilityRole="button" accessibilityLabel="Открыть уведомления" hitSlop={4} onPress={() => router.push('/notifications')} style={({ pressed }) => [styles.bellButton, { backgroundColor: colors.surfaceRaised, opacity: pressed ? 0.72 : 1 }]}>
 				<Bell color={colors.text} size={22} />
 				{unreadCount > 0 && <View style={[styles.badge, { backgroundColor: colors.accent }]}><Text style={[styles.badgeText, { color: colors.onAccent }]}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View>}
 			</Pressable>
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
 	progressTrack: { height: 8, overflow: 'hidden', borderRadius: 999 },
 	progressFill: { height: '100%', borderRadius: 999 },
 	settingsGroup: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 22, paddingHorizontal: 16 },
-	settingRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 16, position: 'relative' },
+	settingRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 16, position: 'relative' },
 	settingLabel: { flex: 1, fontSize: 16 },
 	settingValue: { fontSize: 14 },
 	rowDivider: { position: 'absolute', right: 0, bottom: 0, left: 48, height: StyleSheet.hairlineWidth },

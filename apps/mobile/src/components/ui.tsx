@@ -24,7 +24,7 @@ export function ScreenHeader({ title, back = false, backFallback, action }: { ti
 	const canGoBack = router.canGoBack()
 	const fallback = backFallback ?? '/(tabs)'
 	return <View style={styles.header}>
-		<View style={styles.headerTitleRow}>{back && <Pressable accessibilityLabel="Назад" hitSlop={10} disabled={!canGoBack && !backFallback} onPress={() => goBackOrReplace(router, fallback)} style={[styles.backButton, !canGoBack && !backFallback && styles.backButtonDisabled]}><ChevronLeft size={24} color={colors.text} /></Pressable>}<View style={styles.headerCopy}><Text style={[styles.heading, { color: colors.text }]}>{title}</Text></View></View>{action}
+		<View style={styles.headerTitleRow}>{back && <Pressable accessibilityRole="button" accessibilityLabel="Назад" hitSlop={2} disabled={!canGoBack && !backFallback} onPress={() => goBackOrReplace(router, fallback)} style={[styles.backButton, !canGoBack && !backFallback && styles.backButtonDisabled]}><ChevronLeft size={24} color={colors.text} /></Pressable>}<View style={styles.headerCopy}><Text style={[styles.heading, { color: colors.text }]}>{title}</Text></View></View>{action}
 	</View>
 }
 
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
 	header: { minHeight: 64, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 },
 	headerTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
 	headerCopy: { flex: 1 },
-	backButton: { marginTop: 8, padding: 2 },
+	backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 2, borderRadius: 22 },
 	backButtonDisabled: { opacity: 0.35 },
 	heading: { fontSize: 28, fontWeight: '600', letterSpacing: -0.8 },
 	sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
