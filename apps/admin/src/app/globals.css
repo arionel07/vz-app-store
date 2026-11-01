@@ -105,6 +105,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .account-popover { position: absolute; right: 0; bottom: calc(100% + 8px); left: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-raised); box-shadow: 0 14px 32px rgba(0, 0, 0, .18); padding: 5px; }
 .account-popover button { display: block; width: 100%; border: 0; border-radius: 7px; background: transparent; color: var(--foreground); padding: 8px 9px; text-align: left; font-size: 12px; }
 .account-popover button:hover { background: var(--muted); }
+.account-popover .account-logout { display: flex; align-items: center; gap: 8px; margin-top: 3px; border-top: 1px solid var(--border); border-radius: 0 0 7px 7px; color: #dc2626; padding-top: 10px; }
+.dark .account-popover .account-logout { color: #f87171; }
+.account-popover .account-logout:hover { background: color-mix(in srgb, #dc2626 10%, transparent); }
 
 .app-main { min-width: 0; flex: 1; margin-left: 248px; padding: 0 48px 48px; }
 .topbar { display: flex; height: 76px; align-items: center; justify-content: space-between; }
@@ -254,11 +257,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (max-width: 680px) { .schedule-toolbar { align-items: stretch; flex-direction: column; }.schedule-week-control { justify-content: space-between; flex-wrap: wrap; }.schedule-week-control > strong { min-width: 0; flex: 1; }.schedule-calendar { min-width: 900px; } }
 .app-main { margin-left: 218px; padding: 0 28px 30px; }
 .topbar { height: 62px; border-bottom: 1px solid transparent; }
-.global-search { display: flex; width: min(440px, 48vw); height: 32px; align-items: center; gap: 9px; margin: 0 auto; border: 1px solid #e3e6eb; border-radius: 8px; background: #fff; color: #8a919c; padding: 0 10px; font-size: 11px; }
+.global-search { display: flex; width: min(440px, 48vw); height: 32px; align-items: center; gap: 9px; margin: 0 auto; border: 1px solid #e3e6eb; border-radius: 8px; background: #fff; color: #8a919c; padding: 0 10px; font: inherit; font-size: 11px; text-align: left; cursor: pointer; }
+.global-search:hover { border-color: var(--border); color: var(--foreground); }
+.global-search:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
 .dark .global-search { border-color: #303641; background: #191c21; }
 .global-search span { overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; }
-.global-search kbd { border: 1px solid #e5e7eb; border-radius: 4px; background: #f6f7f9; padding: 2px 5px; font-size: 9px; }
-.dark .global-search kbd { border-color: #353a43; background: #242830; }
 .topbar-actions { gap: 5px; }
 .topbar .icon-button { width: 30px; height: 30px; border-radius: 7px; }
 .topbar .account-row { width: auto; padding: 3px 5px; }
@@ -269,8 +272,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .notification-button { position: relative; }
 .notification-dot { position: absolute; top: 6px; right: 6px; width: 5px; height: 5px; border: 1px solid var(--surface); border-radius: 50%; background: #ef5b63; }
 .account-theme { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin: 5px 0; padding: 7px 9px; color: var(--muted-foreground); font-size: 11px; }
-.account-theme .theme-switcher { border: 0; padding: 0; }
-.account-theme .theme-choice { width: 24px; height: 23px; }
+.account-theme .theme-switcher { gap: 3px; border: 0; padding: 0; }
+.account-theme .theme-choice { width: 28px; height: 28px; }
 .page-header { min-height: 65px; align-items: center; padding: 18px 0 12px; }
 .page-title { font-size: 26px; font-weight: 650; letter-spacing: -.05em; }
 .page-subtitle { margin-top: 5px; font-size: 12px; }

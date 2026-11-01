@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import {
@@ -25,12 +25,14 @@ import {
 	Sun,
 	UsersRound,
 	LoaderCircle,
+	LogOut,
 	Megaphone,
 	BookOpen,
 	ClipboardCheck,
 } from 'lucide-react'
 import { cn } from 'cn'
 import { getBrowserCsrfToken } from '@/lib/auth-client'
+import { shouldDismissAccountPopover } from '@/lib/account-menu-navigation'
 import { useSessionUser } from '@/components/session-provider'
 
 const navItems = [
@@ -59,7 +61,7 @@ export function ThemeSwitcher() {
 				{ value: 'dark', label: 'Тёмная', icon: Moon },
 				{ value: 'system', label: 'Системная', icon: Monitor },
 			].map(({ value, label, icon: Icon }) => (
-				<button key={value} type="button" aria-label={label} className={cn('theme-choice', mounted && theme === value && 'theme-choice-active')} onClick={() => setTheme(value)}>
+				<button key={value} type="button" aria-label={label} aria-pressed={mounted && theme === value} className={cn('theme-choice', mounted && theme === value && 'theme-choice-active')} onClick={() => setTheme(value)}>
 					<Icon size={15} />
 				</button>
 			))}
@@ -82,6 +84,32 @@ function AccountMenu() {
 	const router = useRouter()
 	const [open, setOpen] = useState(false)
 	const [isLoggingOut, setIsLoggingOut] = useState(false)
+	const wrapRef = useRef<HTMLDivElement>(null)
+	const triggerRef = useRef<HTMLButtonElement>(null)
+
+	useEffect(() => {
+		if (!open) return
+		function closeOnOutsidePointer(event: PointerEvent) {
+			if (event.target instanceof Node && !wrapRef.current?.contains(event.target)) setOpen(false)
+		}
+		function closeOnKeyboardBoundary(event: KeyboardEvent) {
+			const root = wrapRef.current
+			const focusable = root ? Array.from(root.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')) : []
+			const focusIndex = focusable.indexOf(document.activeElement as HTMLElement)
+			if (!shouldDismissAccountPopover({ key: event.key, shiftKey: event.shiftKey, focusIndex, focusableCount: focusable.length })) return
+			if (event.key === 'Escape') {
+				event.preventDefault()
+				triggerRef.current?.focus()
+			}
+			setOpen(false)
+		}
+		document.addEventListener('pointerdown', closeOnOutsidePointer)
+		document.addEventListener('keydown', closeOnKeyboardBoundary)
+		return () => {
+			document.removeEventListener('pointerdown', closeOnOutsidePointer)
+			document.removeEventListener('keydown', closeOnKeyboardBoundary)
+		}
+	}, [open])
 
 	async function handleLogout() {
 		setIsLoggingOut(true)
@@ -106,13 +134,13 @@ function AccountMenu() {
 	}
 
 	return (
-		<div className="account-menu-wrap">
-			<button type="button" className="account-row" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
+		<div ref={wrapRef} className="account-menu-wrap">
+			<button ref={triggerRef} type="button" className="account-row" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls="account-popover">
 				<span className="account-avatar">{userInitials(user.firstName, user.lastName)}</span>
 				<span className="account-copy"><strong>{user.firstName} {user.lastName}</strong><small>{user.email ?? roleLabels[user.role]}</small></span>
 				<ChevronRight size={15} className={cn('account-chevron', open && 'account-chevron-open')} />
 			</button>
-			{open && <div className="account-popover"><div className="px-2 py-2 text-xs text-muted-foreground"><strong className="block text-foreground">{roleLabels[user.role]}</strong><span>{user.email ?? 'Email не указан'}</span></div><div className="account-theme"><span>Тема</span><ThemeSwitcher /></div><button type="button" disabled={isLoggingOut} onClick={handleLogout}>{isLoggingOut && <LoaderCircle size={14} className="mr-2 inline animate-spin" />}Выйти</button></div>}
+			{open && <div id="account-popover" className="account-popover" role="region" aria-label="Меню пользователя"><div className="px-2 py-2 text-xs text-muted-foreground"><strong className="block text-foreground">{roleLabels[user.role]}</strong><span>{user.email ?? 'Email не указан'}</span></div><div className="account-theme" role="group" aria-label="Настройка темы"><span>Тема</span><ThemeSwitcher /></div><button type="button" className="account-logout" disabled={isLoggingOut} onClick={handleLogout}>{isLoggingOut ? <LoaderCircle size={14} className="animate-spin" aria-hidden="true" /> : <LogOut size={14} aria-hidden="true" />}Выйти</button></div>}
 		</div>
 	)
 }
@@ -121,11 +149,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
 	const pathname = usePathname()
 	const isOverview = pathname === '/' || pathname === '/design-system'
 	const router = useRouter()
+	const showSearchNotice = () => toast.info('Поиск скоро появится', { id: 'global-search-notice' })
 
 	return (
 		<div className="admin-shell">
 			<aside className="sidebar">
-				<div className="sidebar-brand"><Leaf size={17} strokeWidth={2.2} /><strong>Vizaje</strong><ChevronRight size={14} className="brand-chevron" /><button type="button" className="sidebar-search" aria-label="Поиск" onClick={() => toast.info('Поиск откроется по сочетанию ⌘ K')}><Search size={15} /></button><button type="button" className="sidebar-compose" aria-label="Создать" onClick={() => toast.info('Создание доступно в разделах «Сотрудники» и «Магазины»')}><Plus size={15} /></button></div>
+				<div className="sidebar-brand"><Leaf size={17} strokeWidth={2.2} /><strong>Vizaje</strong><ChevronRight size={14} className="brand-chevron" /><button type="button" className="sidebar-search" aria-label="Поиск" onClick={showSearchNotice}><Search size={15} /></button><button type="button" className="sidebar-compose" aria-label="Создать" onClick={() => toast.info('Создание доступно в разделах «Сотрудники» и «Магазины»')}><Plus size={15} /></button></div>
 				<nav className="sidebar-nav" aria-label="Основная навигация">
 					<p className="sidebar-label">Рабочая область</p>
 					{navItems.map(({ label, icon: Icon, value }) => {
@@ -151,7 +180,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 				</div>
 			</aside>
 			<main className="app-main">
-				<div className="topbar"><div className="global-search"><Search size={15} /><span>Поиск сотрудников, магазинов, тестов...</span><kbd>⌘ K</kbd></div><div className="topbar-actions"><button type="button" className="icon-button notification-button" aria-label="Уведомления" onClick={() => toast.info('Новых уведомлений нет')}><Bell size={16} /><i className="notification-dot" /></button><AccountMenu /><button type="button" className="icon-button" aria-label="Дополнительные действия" onClick={() => toast.info('Сейчас доступен только демонстрационный режим')}><MoreHorizontal size={18} /></button></div></div>
+				<div className="topbar"><button type="button" className="global-search" aria-label="Поиск сотрудников, магазинов и тестов" onClick={showSearchNotice}><Search size={15} /><span>Поиск сотрудников, магазинов, тестов...</span></button><div className="topbar-actions"><button type="button" className="icon-button notification-button" aria-label="Уведомления" onClick={() => toast.info('Новых уведомлений нет')}><Bell size={16} /><i className="notification-dot" /></button><AccountMenu /><button type="button" className="icon-button" aria-label="Дополнительные действия" onClick={() => toast.info('Сейчас доступен только демонстрационный режим')}><MoreHorizontal size={18} /></button></div></div>
 				<div className="page-container">{children}</div>
 			</main>
 		</div>
